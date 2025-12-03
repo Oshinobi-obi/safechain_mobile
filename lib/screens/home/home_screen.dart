@@ -130,6 +130,12 @@ class _HomeContentState extends State<HomeContent> {
     }
   }
 
+  void _recenterMap() {
+      if (_currentLocation != null) {
+          _mapController.move(LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!), 15.0);
+      }
+  }
+
   @override
   Widget build(BuildContext context) {
     final profilePicUrl = widget.userData?['profile_picture_url'];
@@ -140,47 +146,62 @@ class _HomeContentState extends State<HomeContent> {
         children: [
           const DeviceRegistration(),
           const SizedBox(height: 24),
-          Container(
+          SizedBox(
             height: 300,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12.0),
-              boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.5), spreadRadius: 5, blurRadius: 7, offset: const Offset(0, 3))],
-              border: Border.all(color: Colors.grey[300]!, width: 2),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(10.0),
-              child: FlutterMap(
-                mapController: _mapController,
-                options: MapOptions(
-                  initialCenter: const LatLng(14.700, 121.030),
-                  initialZoom: 15.0,
-                ),
-                children: [
-                  TileLayer(
-                    urlTemplate: 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=uMG221O3FCXWR3ts0EqP',
-                    userAgentPackageName: 'com.safechain.app',
+            child: Stack(
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(12.0),
+                    boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.5), spreadRadius: 5, blurRadius: 7, offset: const Offset(0, 3))],
+                    border: Border.all(color: Colors.grey[300]!, width: 2),
                   ),
-                  if (_currentLocation != null)
-                    MarkerLayer(
-                      markers: [
-                        Marker(
-                          point: LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
-                          width: 80,
-                          height: 80,
-                          child: CircleAvatar(
-                            radius: 40,
-                            backgroundColor: Colors.white,
-                            child: CircleAvatar(
-                                radius: 38,
-                                backgroundImage: profilePicUrl != null ? NetworkImage(profilePicUrl) : null,
-                                child: profilePicUrl == null ? const Icon(Icons.person, size: 40) : null,
-                            ),
-                          ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10.0),
+                    child: FlutterMap(
+                      mapController: _mapController,
+                      options: MapOptions(
+                        initialCenter: const LatLng(14.700, 121.030),
+                        initialZoom: 15.0,
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=uMG221O3FCXWR3ts0EqP',
+                          userAgentPackageName: 'com.safechain.app',
                         ),
+                        if (_currentLocation != null)
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
+                                width: 50,
+                                height: 50,
+                                child: CircleAvatar(
+                                  radius: 25,
+                                  backgroundColor: Colors.white,
+                                  child: CircleAvatar(
+                                    radius: 23,
+                                    backgroundImage: profilePicUrl != null ? NetworkImage(profilePicUrl) : null,
+                                    child: profilePicUrl == null ? const Icon(Icons.person, size: 25) : null,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
                       ],
-                    )
-                ],
-              ),
+                    ),
+                  ),
+                ),
+                Positioned(
+                    bottom: 10,
+                    right: 10,
+                    child: FloatingActionButton(
+                        onPressed: _recenterMap,
+                        mini: true,
+                        child: const Icon(Icons.my_location),
+                    ),
+                )
+              ],
             ),
           ),
           const SizedBox(height: 24),

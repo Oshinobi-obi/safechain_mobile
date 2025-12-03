@@ -18,7 +18,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _fullNameController = TextEditingController();
   final _addressController = TextEditingController();
   final _contactNumberController = TextEditingController();
-  final _emailController = TextEditingController();
+  final _emailController = TextEditingController(); 
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _emergencyNameController = TextEditingController();
@@ -74,7 +74,6 @@ class _SignupScreenState extends State<SignupScreen> {
           'profile_picture_url': null,
         });
 
-        // Show success modal and navigate after a delay
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -127,16 +126,18 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Image.asset('images/logo.png', height: 100),
-              const SizedBox(height: 32),
-              _buildSignupForm(context),
-            ],
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Image.asset('images/logo.png', height: 100),
+                const SizedBox(height: 32),
+                _buildSignupForm(context),
+              ],
+            ),
           ),
         ),
       ),

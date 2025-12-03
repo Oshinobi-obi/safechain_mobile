@@ -9,6 +9,7 @@ import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:safechain/screens/edit_profile/edit_profile_screen.dart';
 import 'package:safechain/screens/login/login_screen.dart';
+import 'package:safechain/modals/success_modal.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -71,8 +72,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Future<void> _sendVerificationEmail() async {
     if (_user != null && !_user!.emailVerified) {
       await _user!.sendEmailVerification();
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Verification email sent! Please check your inbox.')),
+      showDialog(
+        context: context,
+        builder: (context) => const SuccessModal(
+          title: 'Verification Email Sent',
+          message: 'A verification email has been sent. Please check your inbox.',
+        ),
       );
     }
   }
@@ -94,7 +99,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
 
     if (confirm == true) {
-      // Clear Remember Me credentials
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('email');
       await prefs.remove('password');
@@ -168,30 +172,30 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildEmailVerificationStatus() {
     final isVerified = _user?.emailVerified ?? false;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: isVerified ? Colors.green : Colors.red, width: 1),
-      ),
-      child: Column(
-        children: [
-          Text(
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(15),
+            border: Border.all(color: isVerified ? Colors.green : Colors.red, width: 1),
+          ),
+          child: Text(
             isVerified ? 'Email Verified' : 'Email not yet verified!',
             style: TextStyle(color: isVerified ? Colors.green : Colors.red, fontWeight: FontWeight.bold),
           ),
-          if (!isVerified)
-            const SizedBox(height: 8),
-          if (!isVerified)
-            SizedBox(
-              height: 30,
-              child: TextButton(
-                onPressed: _sendVerificationEmail,
-                child: const Text('Verify Email'),
-              ),
-            )
-        ],
-      ),
+        ),
+        if (!isVerified)
+          const SizedBox(height: 8),
+        if (!isVerified)
+          SizedBox(
+            height: 30,
+            child: ElevatedButton(
+              onPressed: _sendVerificationEmail,
+              child: const Text('Verify Email'),
+            ),
+          )
+      ],
     );
   }
 
@@ -205,7 +209,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           onPressed: () {
             Navigator.of(context).push(
               MaterialPageRoute(builder: (context) => EditProfileScreen(userData: _userData!)),
-            ).then((_) => _fetchUserData(_user!)); // Refresh data after editing
+            ).then((_) => _fetchUserData(_user!));
           },
         ),
       ],
