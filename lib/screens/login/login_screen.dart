@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:safechain/screens/home/home_screen.dart';
 import 'package:safechain/screens/signup/signup_screen.dart';
 import 'package:safechain/screens/forgot_password/forgot_password_screen.dart';
+import 'package:safechain/modals/error_modal.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,14 +21,15 @@ class _LoginScreenState extends State<LoginScreen> {
   final _passwordController = TextEditingController();
   bool _isLoading = false;
   bool _rememberMe = false;
+  bool _obscurePassword = true;
 
   @override
   void initState() {
     super.initState();
-    _loadUserCredentials();
+    _loadUserCredentialsAndLogin();
   }
 
-  void _loadUserCredentials() async {
+  void _loadUserCredentialsAndLogin() async {
     final prefs = await SharedPreferences.getInstance();
     final email = prefs.getString('email');
     final password = prefs.getString('password');
@@ -37,16 +39,18 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() {
         _rememberMe = true;
       });
+      _handleLogin(fromAutoLogin: true);
     }
   }
 
-  Future<void> _handleLogin() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _handleLogin({bool fromAutoLogin = false}) async {
+    if (!fromAutoLogin) {
+      if (!_formKey.currentState!.validate()) return;
+    }
 
     setState(() => _isLoading = true);
 
     try {
-      // Set session persistence based on Remember Me checkbox
       if (kIsWeb) {
         await FirebaseAuth.instance.setPersistence(
           _rememberMe ? Persistence.LOCAL : Persistence.SESSION,
@@ -66,21 +70,39 @@ class _LoginScreenState extends State<LoginScreen> {
         await prefs.remove('email');
         await prefs.remove('password');
       }
-
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const HomeScreen()),
-      );
-    } on FirebaseAuthException catch (e) {
-      String message = 'An error occurred.';
-      if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
-        message = 'Invalid email or password.';
+      if(mounted){
+        Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
       }
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+
+    } on FirebaseAuthException catch (e) {
+      String title = 'Login Failed';
+      String message = 'An unexpected error occurred. Please try again.';
+      if (e.code == 'user-not-found' || e.code == 'wrong-password' || e.code == 'invalid-credential') {
+        message = 'The email or password you entered is incorrect. Please check your credentials and try again.';
+      }
+      if(mounted){
+        showDialog(
+            context: context,
+            builder: (context) => ErrorModal(title: title, message: message),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An unexpected error occurred: $e')));
+        if(mounted){
+            showDialog(
+                context: context,
+                builder: (context) => ErrorModal(
+                    title: 'An Unexpected Error Occurred',
+                    message: e.toString(),
+                ),
+            );
+        }
     }
 
-    setState(() => _isLoading = false);
+    if(mounted){
+        setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -94,20 +116,31 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Image.asset('images/logo.png', height: 100),
-              const SizedBox(height: 8),
-              const Text('Your digital safety keychain', style: TextStyle(fontSize: 16, color: Colors.grey)),
-              const SizedBox(height: 32),
-              _buildLoginForm(context),
-            ],
+      body: Stack(
+        children: [
+          Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Image.asset('images/logo.png', height: 100),
+                  const SizedBox(height: 8),
+                  const Text('Your digital safety keychain', style: TextStyle(fontSize: 16, color: Colors.grey)),
+                  const SizedBox(height: 32),
+                  _buildLoginForm(context),
+                ],
+              ),
+            ),
           ),
-        ),
+          if (_isLoading)
+            Container(
+              color: Colors.black.withOpacity(0.5),
+              child: const Center(
+                child: CircularProgressIndicator(),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -138,8 +171,20 @@ class _LoginScreenState extends State<LoginScreen> {
             const SizedBox(height: 16),
             TextFormField(
               controller: _passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(labelText: 'Password', hintText: 'Enter your password', prefixIcon: Icon(Icons.lock)),
+              obscureText: _obscurePassword,
+              decoration: InputDecoration(
+                labelText: 'Password', 
+                hintText: 'Enter your password', 
+                prefixIcon: const Icon(Icons.lock),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                  onPressed: () {
+                    setState(() {
+                      _obscurePassword = !_obscurePassword;
+                    });
+                  },
+                ),
+              ),
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your password';
@@ -174,7 +219,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 minimumSize: const Size(double.infinity, 50),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
               ),
-              child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('Login', style: TextStyle(fontSize: 18, color: Colors.white)),
+              child: const Text('Login', style: TextStyle(fontSize: 18, color: Colors.white)),
             ),
             const SizedBox(height: 24),
             Row(

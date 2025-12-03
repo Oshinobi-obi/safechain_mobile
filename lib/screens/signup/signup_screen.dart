@@ -18,7 +18,7 @@ class _SignupScreenState extends State<SignupScreen> {
   final _fullNameController = TextEditingController();
   final _addressController = TextEditingController();
   final _contactNumberController = TextEditingController();
-  final _emailController = TextEditingController(); 
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _emergencyNameController = TextEditingController();
@@ -27,6 +27,8 @@ class _SignupScreenState extends State<SignupScreen> {
 
   double _passwordStrength = 0;
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _obscureConfirmPassword = true;
 
   final RegExp _hasUpperCase = RegExp(r'[A-Z]');
   final RegExp _hasLowerCase = RegExp(r'[a-z]');
@@ -37,6 +39,8 @@ class _SignupScreenState extends State<SignupScreen> {
   void initState() {
     super.initState();
     _passwordController.addListener(_updatePasswordStrength);
+    _passwordController.addListener(() => setState(() {}));
+    _confirmPasswordController.addListener(() => setState(() {}));
   }
 
   void _updatePasswordStrength() {
@@ -103,13 +107,15 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     if (mounted) {
-        setState(() => _isLoading = false);
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   void dispose() {
     _passwordController.removeListener(_updatePasswordStrength);
+    _passwordController.removeListener(() => setState(() {}));
+    _confirmPasswordController.removeListener(() => setState(() {}));
     _fullNameController.dispose();
     _addressController.dispose();
     _contactNumberController.dispose();
@@ -157,18 +163,25 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTextFormField(label: 'Full Name *', hint: 'Enter your full name', controller: _fullNameController),
+              _buildTextFormField(label: 'Full Name', hint: 'Enter your full name', controller: _fullNameController),
               const SizedBox(height: 16),
-              _buildTextFormField(label: 'Email *', hint: 'Enter your email address', controller: _emailController, keyboardType: TextInputType.emailAddress),
+              _buildTextFormField(label: 'Email', hint: 'Enter your email address', controller: _emailController, keyboardType: TextInputType.emailAddress),
               const SizedBox(height: 16),
-              _buildTextFormField(label: 'Complete Address *', hint: 'Enter your complete address', controller: _addressController),
+              _buildTextFormField(label: 'Complete Address', hint: 'Enter your complete address', controller: _addressController),
               const SizedBox(height: 16),
-              _buildTextFormField(label: 'Contact Number *', hint: 'Enter your contact number', controller: _contactNumberController),
+              _buildTextFormField(label: 'Contact Number', hint: 'Enter your contact number', controller: _contactNumberController),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Password *', hintText: 'Enter your password'),
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
+                  label: _buildRequiredLabel('Password'),
+                  hintText: 'Enter your password',
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                  ),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'Please enter a password';
                   if (_passwordStrength < 0.9) return 'Password is too weak';
@@ -187,8 +200,16 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _confirmPasswordController,
-                obscureText: true,
-                decoration: const InputDecoration(labelText: 'Confirm Password *', hintText: 'Re-enter your password'),
+                obscureText: _obscureConfirmPassword,
+                decoration: InputDecoration(
+                  label: _buildRequiredLabel('Confirm Password'),
+                  hintText: 'Re-enter your password',
+                  errorText: _confirmPasswordController.text.isNotEmpty && _passwordController.text != _confirmPasswordController.text ? 'Passwords do not match' : null,
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
+                    onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
+                  ),
+                ),
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'Please confirm your password';
                   if (value != _passwordController.text) return 'Passwords do not match';
@@ -196,11 +217,11 @@ class _SignupScreenState extends State<SignupScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              _buildTextFormField(label: 'Emergency Contact Person Name *', hint: 'Enter name', controller: _emergencyNameController),
+              _buildTextFormField(label: 'Emergency Contact Person Name', hint: 'Enter name', controller: _emergencyNameController),
               const SizedBox(height: 16),
-              _buildTextFormField(label: 'Emergency Contact Number *', hint: 'Enter number', controller: _emergencyNumberController),
+              _buildTextFormField(label: 'Emergency Contact Number', hint: 'Enter number', controller: _emergencyNumberController),
               const SizedBox(height: 16),
-              _buildTextFormField(label: 'Emergency Contact Address *', hint: 'Enter address', controller: _emergencyAddressController),
+              _buildTextFormField(label: 'Emergency Contact Address', hint: 'Enter address', controller: _emergencyAddressController),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isLoading ? null : _handleSignup,
@@ -228,12 +249,24 @@ class _SignupScreenState extends State<SignupScreen> {
     return TextFormField(
       controller: controller,
       keyboardType: keyboardType,
-      decoration: InputDecoration(labelText: label, hintText: hint),
+      decoration: InputDecoration(label: _buildRequiredLabel(label), hintText: hint),
       validator: (value) {
-        if (value == null || value.isEmpty) return 'Please enter your $label';
-        if (label == 'Email *' && !value.contains('@')) return 'Please enter a valid email';
+        if (value == null || value.isEmpty) return 'This field cannot be empty';
+        if (label == 'Email' && !value.contains('@')) return 'Please enter a valid email';
         return null;
       },
+    );
+  }
+
+  RichText _buildRequiredLabel(String label) {
+    return RichText(
+      text: TextSpan(
+        text: label,
+        style: TextStyle(color: Colors.grey[600], fontSize: 16),
+        children: const <TextSpan>[
+          TextSpan(text: ' *', style: TextStyle(color: Colors.red)),
+        ],
+      ),
     );
   }
 }

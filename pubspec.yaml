@@ -24,6 +24,7 @@ dependencies:
   # Local Storage
   shared_preferences: ^2.2.3
 
+  latlong2: any
 dev_dependencies:
   flutter_test:
     sdk: flutter

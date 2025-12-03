@@ -1,11 +1,8 @@
 
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:safechain/screens/edit_profile/edit_profile_screen.dart';
 import 'package:safechain/screens/login/login_screen.dart';
@@ -23,6 +20,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
   StreamSubscription<User?>? _authSubscription;
+
+  final List<IconData> _avatars = const [
+    Icons.person, Icons.face, Icons.account_circle, Icons.star,
+    Icons.shield, Icons.home, Icons.pets, Icons.favorite,
+    Icons.eco, Icons.public, Icons.anchor, Icons.bug_report,
+  ];
 
   @override
   void initState() {
@@ -48,24 +51,58 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _pickAndUploadImage() async {
-    final picker = ImagePicker();
-    final pickedFile = await picker.pickImage(source: ImageSource.gallery);
+  Future<void> _selectAvatar() async {
+    final int? selectedIndex = await showDialog<int>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Select an Avatar'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: GridView.builder(
+              shrinkWrap: true,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+              ),
+              itemCount: _avatars.length,
+              itemBuilder: (context, index) {
+                return InkWell(
+                  onTap: () {
+                    Navigator.of(context).pop(index);
+                  },
+                  child: Icon(_avatars[index], size: 40, color: Colors.black54),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
 
-    if (pickedFile != null) {
-      final file = File(pickedFile.path);
-      final ref = FirebaseStorage.instance.ref().child('profile_pictures').child(_user!.uid + '.jpg');
-      final uploadTask = ref.putFile(file);
-      final snapshot = await uploadTask.whenComplete(() => {});
-      final downloadUrl = await snapshot.ref.getDownloadURL();
+    if (selectedIndex != null) {
+      try {
+        await FirebaseFirestore.instance.collection('residents').doc(_user!.uid).update({
+          'avatar_index': selectedIndex,
+          'profile_picture_url': null, // Clear old picture url
+          'avatar_codepoint': null, // Clear old codepoint
+        });
 
-      await FirebaseFirestore.instance.collection('residents').doc(_user!.uid).update({
-        'profile_picture_url': downloadUrl,
-      });
-
-      setState(() {
-        _userData!['profile_picture_url'] = downloadUrl;
-      });
+        if (mounted) {
+          setState(() {
+            _userData!['avatar_index'] = selectedIndex;
+            _userData!.remove('profile_picture_url');
+            _userData!.remove('avatar_codepoint');
+          });
+        }
+      } on FirebaseException catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Failed to save avatar: ${e.message}")),
+          );
+        }
+      }
     }
   }
 
@@ -105,10 +142,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       
       await FirebaseAuth.instance.signOut();
       
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
+      if (mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          (route) => false,
+        );
+      }
     }
   }
 
@@ -141,7 +180,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileHeader() {
-    final profilePicUrl = _userData?['profile_picture_url'];
+    final avatarIndex = _userData?['avatar_index'];
     final initials = _userData?['full_name']?.substring(0, 2).toUpperCase() ?? 'N/A';
 
     return Center(
@@ -149,18 +188,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           CircleAvatar(
             radius: 50,
-            backgroundImage: profilePicUrl != null ? NetworkImage(profilePicUrl) : null,
-            child: profilePicUrl == null ? Text(initials, style: const TextStyle(fontSize: 40)) : null,
+            backgroundColor: Colors.grey.shade400,
+            child: (avatarIndex != null && avatarIndex >= 0 && avatarIndex < _avatars.length)
+                ? Icon(_avatars[avatarIndex], size: 60, color: Colors.white)
+                : Text(initials, style: const TextStyle(fontSize: 40, color: Colors.white)),
           ),
           Positioned(
             bottom: 0,
             right: 0,
             child: InkWell(
-              onTap: _pickAndUploadImage,
+              onTap: _selectAvatar,
               child: CircleAvatar(
                 radius: 15,
                 backgroundColor: Colors.grey[200],
-                child: const Icon(Icons.camera_alt, size: 15),
+                child: const Icon(Icons.edit, size: 15),
               ),
             ),
           ),
@@ -207,9 +248,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         IconButton(
           icon: const Icon(Icons.edit),
           onPressed: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(builder: (context) => EditProfileScreen(userData: _userData!)),
-            ).then((_) => _fetchUserData(_user!));
+            if (_user != null && _userData != null) {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => EditProfileScreen(userData: _userData!)),
+              ).then((_) => _fetchUserData(_user!));
+            }
           },
         ),
       ],
