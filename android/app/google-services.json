@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "700412208028",
+    "project_id": "safechain-4daf7",
+    "storage_bucket": "safechain-4daf7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:700412208028:android:66fe1bb5c04a8f5c97de59",
+        "android_client_info": {
+          "package_name": "com.safechain.safechain"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBki0uYMdKd5jRXv9ga-_uV_KTY6LY2Vcc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
