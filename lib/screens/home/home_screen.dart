@@ -21,6 +21,12 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   Map<String, dynamic>? _userData;
 
+  final List<IconData> _avatars = const [
+    Icons.person, Icons.face, Icons.account_circle, Icons.star,
+    Icons.shield, Icons.home, Icons.pets, Icons.favorite,
+    Icons.eco, Icons.public, Icons.anchor, Icons.bug_report,
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -40,6 +46,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onItemTapped(int index) {
+    if (_selectedIndex == index && index == 1) {
+       _fetchUserData();
+    } 
     setState(() {
       _selectedIndex = index;
     });
@@ -48,7 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> widgetOptions = <Widget>[
-      HomeContent(userData: _userData),
+      HomeContent(userData: _userData, avatars: _avatars),
       const ProfileScreen(),
     ];
 
@@ -85,7 +94,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class HomeContent extends StatefulWidget {
   final Map<String, dynamic>? userData;
-  const HomeContent({super.key, this.userData});
+  final List<IconData> avatars;
+  const HomeContent({super.key, this.userData, required this.avatars});
 
   @override
   State<HomeContent> createState() => _HomeContentState();
@@ -94,6 +104,7 @@ class HomeContent extends StatefulWidget {
 class _HomeContentState extends State<HomeContent> {
   LocationData? _currentLocation;
   late final MapController _mapController;
+  bool _isSatellite = false;
 
   @override
   void initState() {
@@ -136,9 +147,15 @@ class _HomeContentState extends State<HomeContent> {
       }
   }
 
+  void _toggleMapStyle() {
+    setState(() {
+      _isSatellite = !_isSatellite;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    final profilePicUrl = widget.userData?['profile_picture_url'];
+    final avatarIndex = widget.userData?['avatar_index'];
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),
@@ -166,7 +183,9 @@ class _HomeContentState extends State<HomeContent> {
                       ),
                       children: [
                         TileLayer(
-                          urlTemplate: 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=uMG221O3FCXWR3ts0EqP',
+                          urlTemplate: _isSatellite 
+                            ? 'https://api.maptiler.com/maps/satellite/{z}/{x}/{y}.jpg?key=uMG221O3FCXWR3ts0EqP'
+                            : 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=uMG221O3FCXWR3ts0EqP',
                           userAgentPackageName: 'com.safechain.app',
                         ),
                         if (_currentLocation != null)
@@ -181,8 +200,10 @@ class _HomeContentState extends State<HomeContent> {
                                   backgroundColor: Colors.white,
                                   child: CircleAvatar(
                                     radius: 23,
-                                    backgroundImage: profilePicUrl != null ? NetworkImage(profilePicUrl) : null,
-                                    child: profilePicUrl == null ? const Icon(Icons.person, size: 25) : null,
+                                    backgroundColor: Colors.grey.shade400,
+                                    child: (avatarIndex != null && avatarIndex >= 0 && avatarIndex < widget.avatars.length)
+                                      ? Icon(widget.avatars[avatarIndex], size: 30, color: Colors.white)
+                                      : const Icon(Icons.person, size: 30, color: Colors.white),
                                   ),
                                 ),
                               ),
@@ -196,9 +217,20 @@ class _HomeContentState extends State<HomeContent> {
                     bottom: 10,
                     right: 10,
                     child: FloatingActionButton(
+                        heroTag: 'recenter',
                         onPressed: _recenterMap,
                         mini: true,
                         child: const Icon(Icons.my_location),
+                    ),
+                ),
+                Positioned(
+                    bottom: 60,
+                    right: 10,
+                    child: FloatingActionButton(
+                        heroTag: 'toggleStyle',
+                        onPressed: _toggleMapStyle,
+                        mini: true,
+                        child: Icon(_isSatellite ? Icons.map : Icons.satellite),
                     ),
                 )
               ],

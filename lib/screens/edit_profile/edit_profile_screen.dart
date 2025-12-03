@@ -63,8 +63,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       await Future.delayed(const Duration(seconds: 2));
 
-      Navigator.of(context).pop(); // Close the modal
-      Navigator.of(context).pop(); // Go back to the profile screen
+      Navigator.of(context).pop();
+      Navigator.of(context).pop();
 
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An error occurred: $e')));

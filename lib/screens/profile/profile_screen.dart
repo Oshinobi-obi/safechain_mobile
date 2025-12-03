@@ -85,8 +85,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
       try {
         await FirebaseFirestore.instance.collection('residents').doc(_user!.uid).update({
           'avatar_index': selectedIndex,
-          'profile_picture_url': null, // Clear old picture url
-          'avatar_codepoint': null, // Clear old codepoint
+          'profile_picture_url': null,
+          'avatar_codepoint': null,
         });
 
         if (mounted) {
