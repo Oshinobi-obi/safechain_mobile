@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:safechain/modals/success_modal.dart';
@@ -30,10 +31,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     super.initState();
     _fullNameController = TextEditingController(text: widget.userData['full_name']);
     _addressController = TextEditingController(text: widget.userData['address']);
-    _contactNumberController = TextEditingController(text: widget.userData['contact_number']);
+    _contactNumberController = TextEditingController(text: _formatPhoneNumberOnLoad(widget.userData['contact_number']));
     _emergencyNameController = TextEditingController(text: widget.userData['emergency_contact_person_name']);
-    _emergencyNumberController = TextEditingController(text: widget.userData['emergency_contact_number']);
+    _emergencyNumberController = TextEditingController(text: _formatPhoneNumberOnLoad(widget.userData['emergency_contact_number']));
     _emergencyAddressController = TextEditingController(text: widget.userData['emergency_contact_address']);
+  }
+
+  String _formatPhoneNumberOnLoad(String? phoneNumber) {
+    if (phoneNumber == null) return '';
+    // Assuming the phone number from the database is always 10 digits.
+    if (phoneNumber.length == 10) {
+      return '${phoneNumber.substring(0, 3)}-${phoneNumber.substring(3, 6)}-${phoneNumber.substring(6)}';
+    }
+    return phoneNumber;
   }
 
   Future<void> _handleUpdateProfile() async {

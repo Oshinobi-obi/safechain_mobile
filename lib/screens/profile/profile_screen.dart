@@ -50,6 +50,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  String _formatPhoneNumber(String? phoneNumber) {
+    if (phoneNumber == null || phoneNumber.length != 10) {
+      return phoneNumber ?? 'N/A';
+    }
+    return '+63 ${phoneNumber.substring(0, 3)}-${phoneNumber.substring(3, 6)}-${phoneNumber.substring(6)}';
+  }
+
   Future<void> _selectAvatar() async {
     final int? selectedIndex = await showDialog<int>(
       context: context,
@@ -262,12 +269,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       children: [
         InfoRow(icon: Icons.person, label: 'Full Name', value: _userData?['full_name'] ?? 'N/A'),
-        InfoRow(icon: Icons.email, label: 'Email', value: _userData?['email'] ?? 'N/A'),
+        InfoRow(icon: Icons.email, label: 'Email', value: _userData?['email'] ?? 'N A'),
         InfoRow(icon: Icons.location_on, label: 'Complete Address', value: _userData?['address'] ?? 'N/A'),
-        InfoRow(icon: Icons.phone, label: 'Contact Number', value: _userData?['contact_number'] ?? 'N/A'),
+        InfoRow(icon: Icons.phone, label: 'Contact Number', value: _formatPhoneNumber(_userData?['contact_number'])),
         const Divider(height: 32),
         InfoRow(icon: Icons.contact_mail, label: 'Emergency Contact Name', value: _userData?['emergency_contact_person_name'] ?? 'N/A'),
-        InfoRow(icon: Icons.phone, label: 'Emergency Contact Number', value: _userData?['emergency_contact_number'] ?? 'N/A'),
+        InfoRow(icon: Icons.phone, label: 'Emergency Contact Number', value: _formatPhoneNumber(_userData?['emergency_contact_number'])),
         InfoRow(icon: Icons.location_on, label: 'Emergency Contact Address', value: _userData?['emergency_contact_address'] ?? 'N/A'),
       ],
     );
