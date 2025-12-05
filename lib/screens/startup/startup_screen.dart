@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:safechain/screens/login/login_screen.dart';

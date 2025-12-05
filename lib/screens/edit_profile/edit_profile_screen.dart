@@ -1,9 +1,9 @@
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:safechain/modals/success_modal.dart';
 import 'package:safechain/widgets/curved_app_bar.dart';
+import 'package:safechain/widgets/phone_number_input.dart';
 
 class EditProfileScreen extends StatefulWidget {
   final Map<String, dynamic> userData;
@@ -46,9 +46,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       await FirebaseFirestore.instance.collection('residents').doc(user.uid).update({
         'full_name': _fullNameController.text,
         'address': _addressController.text,
-        'contact_number': _contactNumberController.text,
+        'contact_number': _contactNumberController.text.replaceAll('-', ''),
         'emergency_contact_person_name': _emergencyNameController.text,
-        'emergency_contact_number': _emergencyNumberController.text,
+        'emergency_contact_number': _emergencyNumberController.text.replaceAll('-', ''),
         'emergency_contact_address': _emergencyAddressController.text,
       });
 
@@ -115,17 +115,53 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       key: _formKey,
       child: Column(
         children: [
-          _buildTextFormField(label: 'Full Name', controller: _fullNameController),
+          TextFormField(
+            controller: _fullNameController,
+            decoration: const InputDecoration(labelText: 'Full Name'),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your Full Name';
+              }
+              return null;
+            },
+          ),
           const SizedBox(height: 16),
-          _buildTextFormField(label: 'Complete Address', controller: _addressController),
+          TextFormField(
+            controller: _addressController,
+            decoration: const InputDecoration(labelText: 'Complete Address'),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your Complete Address';
+              }
+              return null;
+            },
+          ),
           const SizedBox(height: 16),
-          _buildTextFormField(label: 'Contact Number', controller: _contactNumberController),
+          PhoneNumberInput(label: 'Contact Number', hint: '912-345-6789', controller: _contactNumberController),
           const SizedBox(height: 16),
-          _buildTextFormField(label: 'Emergency Contact Name', controller: _emergencyNameController),
+          TextFormField(
+            controller: _emergencyNameController,
+            decoration: const InputDecoration(labelText: 'Emergency Contact Name'),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your Emergency Contact Name';
+              }
+              return null;
+            },
+          ),
           const SizedBox(height: 16),
-          _buildTextFormField(label: 'Emergency Contact Number', controller: _emergencyNumberController),
+          PhoneNumberInput(label: 'Emergency Contact Number', hint: '912-345-6789', controller: _emergencyNumberController),
           const SizedBox(height: 16),
-          _buildTextFormField(label: 'Emergency Contact Address', controller: _emergencyAddressController),
+          TextFormField(
+            controller: _emergencyAddressController,
+            decoration: const InputDecoration(labelText: 'Emergency Contact Address'),
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter your Emergency Contact Address';
+              }
+              return null;
+            },
+          ),
           const SizedBox(height: 32),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -144,19 +180,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           )
         ],
       ),
-    );
-  }
-
-  Widget _buildTextFormField({required String label, required TextEditingController controller}) {
-    return TextFormField(
-      controller: controller,
-      decoration: InputDecoration(labelText: label),
-      validator: (value) {
-        if (value == null || value.isEmpty) {
-          return 'Please enter your $label';
-        }
-        return null;
-      },
     );
   }
 }

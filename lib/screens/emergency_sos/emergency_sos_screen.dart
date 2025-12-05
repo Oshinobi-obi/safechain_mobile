@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:safechain/widgets/curved_app_bar.dart';
 

@@ -1,9 +1,9 @@
-
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:safechain/modals/success_modal.dart';
 import 'package:safechain/screens/login/login_screen.dart';
+import 'package:safechain/widgets/phone_number_input.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -69,10 +69,10 @@ class _SignupScreenState extends State<SignupScreen> {
         await FirebaseFirestore.instance.collection('residents').doc(userCredential.user!.uid).set({
           'full_name': _fullNameController.text,
           'address': _addressController.text,
-          'contact_number': _contactNumberController.text,
+          'contact_number': _contactNumberController.text.replaceAll('-', ''),
           'email': _emailController.text,
           'emergency_contact_person_name': _emergencyNameController.text,
-          'emergency_contact_number': _emergencyNumberController.text,
+          'emergency_contact_number': _emergencyNumberController.text.replaceAll('-', ''),
           'emergency_contact_address': _emergencyAddressController.text,
           'registered_date': Timestamp.now(),
           'profile_picture_url': null,
@@ -163,13 +163,36 @@ class _SignupScreenState extends State<SignupScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildTextFormField(label: 'Full Name', hint: 'Enter your full name', controller: _fullNameController),
+              TextFormField(
+                controller: _fullNameController,
+                decoration: InputDecoration(label: _buildRequiredLabel('Full Name'), hintText: 'Enter your full name'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'This field cannot be empty';
+                  return null;
+                },
+              ),
               const SizedBox(height: 16),
-              _buildTextFormField(label: 'Email', hint: 'Enter your email address', controller: _emailController, keyboardType: TextInputType.emailAddress),
+              TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: InputDecoration(label: _buildRequiredLabel('Email'), hintText: 'Enter your email address'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'This field cannot be empty';
+                  if (!value.contains('@')) return 'Please enter a valid email';
+                  return null;
+                },
+              ),
               const SizedBox(height: 16),
-              _buildTextFormField(label: 'Complete Address', hint: 'Enter your complete address', controller: _addressController),
+              TextFormField(
+                controller: _addressController,
+                decoration: InputDecoration(label: _buildRequiredLabel('Complete Address'), hintText: 'Enter your complete address'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'This field cannot be empty';
+                  return null;
+                },
+              ),
               const SizedBox(height: 16),
-              _buildTextFormField(label: 'Contact Number', hint: 'Enter your contact number', controller: _contactNumberController),
+              PhoneNumberInput(label: 'Contact Number', hint: '912-345-6789', controller: _contactNumberController),
               const SizedBox(height: 16),
               TextFormField(
                 controller: _passwordController,
@@ -204,7 +227,7 @@ class _SignupScreenState extends State<SignupScreen> {
                 decoration: InputDecoration(
                   label: _buildRequiredLabel('Confirm Password'),
                   hintText: 'Re-enter your password',
-                  errorText: _confirmPasswordController.text.isNotEmpty && _passwordController.text != _confirmPasswordController.text ? 'Passwords do not match' : null,
+                  errorText: _confirmPasswordController.text.isNotEmpty && _passwordController.text != _passwordController.text ? 'Passwords do not match' : null,
                   suffixIcon: IconButton(
                     icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
                     onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
@@ -217,11 +240,25 @@ class _SignupScreenState extends State<SignupScreen> {
                 },
               ),
               const SizedBox(height: 16),
-              _buildTextFormField(label: 'Emergency Contact Person Name', hint: 'Enter name', controller: _emergencyNameController),
+              TextFormField(
+                controller: _emergencyNameController,
+                decoration: InputDecoration(label: _buildRequiredLabel('Emergency Contact Person Name'), hintText: 'Enter name'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'This field cannot be empty';
+                  return null;
+                },
+              ),
               const SizedBox(height: 16),
-              _buildTextFormField(label: 'Emergency Contact Number', hint: 'Enter number', controller: _emergencyNumberController),
+              PhoneNumberInput(label: 'Emergency Contact Number', hint: '912-345-6789', controller: _emergencyNumberController),
               const SizedBox(height: 16),
-              _buildTextFormField(label: 'Emergency Contact Address', hint: 'Enter address', controller: _emergencyAddressController),
+              TextFormField(
+                controller: _emergencyAddressController,
+                decoration: InputDecoration(label: _buildRequiredLabel('Emergency Contact Address'), hintText: 'Enter address'),
+                validator: (value) {
+                  if (value == null || value.isEmpty) return 'This field cannot be empty';
+                  return null;
+                },
+              ),
               const SizedBox(height: 24),
               ElevatedButton(
                 onPressed: _isLoading ? null : _handleSignup,
@@ -243,19 +280,6 @@ class _SignupScreenState extends State<SignupScreen> {
             ],
           ),
         ));
-  }
-
-  Widget _buildTextFormField({required String label, required String hint, required TextEditingController controller, TextInputType? keyboardType}) {
-    return TextFormField(
-      controller: controller,
-      keyboardType: keyboardType,
-      decoration: InputDecoration(label: _buildRequiredLabel(label), hintText: hint),
-      validator: (value) {
-        if (value == null || value.isEmpty) return 'This field cannot be empty';
-        if (label == 'Email' && !value.contains('@')) return 'Please enter a valid email';
-        return null;
-      },
-    );
   }
 
   RichText _buildRequiredLabel(String label) {

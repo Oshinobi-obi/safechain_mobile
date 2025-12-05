@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -106,6 +105,13 @@ class _HomeContentState extends State<HomeContent> {
   late final MapController _mapController;
   bool _isSatellite = false;
 
+  final List<LatLng> _gulodBoundary = [
+    LatLng(14.7195, 121.0350),
+    LatLng(14.7180, 121.0420),
+    LatLng(14.7080, 121.0450),
+    LatLng(14.7065, 121.0370),
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -134,9 +140,6 @@ class _HomeContentState extends State<HomeContent> {
     if (mounted) {
       setState(() {
         _currentLocation = locationData;
-        if (_currentLocation != null) {
-          _mapController.move(LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!), 15.0);
-        }
       });
     }
   }
@@ -178,8 +181,8 @@ class _HomeContentState extends State<HomeContent> {
                     child: FlutterMap(
                       mapController: _mapController,
                       options: MapOptions(
-                        initialCenter: const LatLng(14.700, 121.030),
-                        initialZoom: 15.0,
+                        initialCenter: const LatLng(14.7120, 121.0387),
+                        initialZoom: 14.0,
                       ),
                       children: [
                         TileLayer(
@@ -187,6 +190,16 @@ class _HomeContentState extends State<HomeContent> {
                             ? 'https://api.maptiler.com/maps/satellite/{z}/{x}/{y}.jpg?key=uMG221O3FCXWR3ts0EqP'
                             : 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=uMG221O3FCXWR3ts0EqP',
                           userAgentPackageName: 'com.safechain.app',
+                        ),
+                        PolygonLayer(
+                          polygons: [
+                            Polygon(
+                              points: _gulodBoundary,
+                              color: Colors.blue.withOpacity(0.1),
+                              borderColor: Colors.blue,
+                              borderStrokeWidth: 3,
+                            ),
+                          ],
                         ),
                         if (_currentLocation != null)
                           MarkerLayer(
