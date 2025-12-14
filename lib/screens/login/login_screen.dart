@@ -6,6 +6,7 @@ import 'package:safechain/screens/home/home_screen.dart';
 import 'package:safechain/screens/signup/signup_screen.dart';
 import 'package:safechain/screens/forgot_password/forgot_password_screen.dart';
 import 'package:safechain/modals/error_modal.dart';
+import 'package:safechain/widgets/safechain_logo.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -124,8 +125,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset('images/logo.png', height: 100),
-                  const SizedBox(height: 16),
-                  const Text('SafeChain', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 12),
+                  const SafeChainLogo(),
                   const SizedBox(height: 8),
                   const Text('Your digital safety keychain', style: TextStyle(fontSize: 16, color: Colors.grey)),
                   const SizedBox(height: 32),

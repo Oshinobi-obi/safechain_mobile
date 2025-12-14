@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:safechain/modals/success_modal.dart';
 import 'package:safechain/screens/login/login_screen.dart';
 import 'package:safechain/widgets/phone_number_input.dart';
+import 'package:safechain/widgets/safechain_logo.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -140,8 +141,8 @@ class _SignupScreenState extends State<SignupScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Image.asset('images/logo.png', height: 100),
-                const SizedBox(height: 16),
-                const Text('SafeChain', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 12),
+                const SafeChainLogo(),
                 const SizedBox(height: 8),
                 const Text('Your digital safety keychain', style: TextStyle(fontSize: 16, color: Colors.grey)),
                 const SizedBox(height: 32),
