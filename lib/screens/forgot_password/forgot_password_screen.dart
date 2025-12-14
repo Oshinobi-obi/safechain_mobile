@@ -72,9 +72,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
             children: [
               Image.asset('images/logo.png', height: 100),
               const SizedBox(height: 16),
-              const Text('Reset Password', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              const Text('SafeChain', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              const Text('Enter your email to receive a password reset link.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey)),
+              const Text('Your digital safety keychain', style: TextStyle(fontSize: 16, color: Colors.grey)),
               const SizedBox(height: 32),
               _buildResetForm(context),
             ],
@@ -96,6 +96,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         key: _formKey,
         child: Column(
           children: [
+            const Text('Reset Password', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('Enter your email to receive a password reset link.', textAlign: TextAlign.center, style: TextStyle(fontSize: 16, color: Colors.grey)),
+            const SizedBox(height: 16),
             TextFormField(
               controller: _emailController,
               decoration: const InputDecoration(labelText: 'Email', hintText: 'Enter your email', prefixIcon: Icon(Icons.email)),

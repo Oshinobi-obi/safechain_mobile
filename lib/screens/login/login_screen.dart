@@ -124,6 +124,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Image.asset('images/logo.png', height: 100),
+                  const SizedBox(height: 16),
+                  const Text('SafeChain', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   const Text('Your digital safety keychain', style: TextStyle(fontSize: 16, color: Colors.grey)),
                   const SizedBox(height: 32),
@@ -212,7 +214,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: _isLoading ? null : _handleLogin,
+              onPressed: _isLoading ? null : () => _handleLogin(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF20C997),
                 minimumSize: const Size(double.infinity, 50),

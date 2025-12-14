@@ -140,6 +140,10 @@ class _SignupScreenState extends State<SignupScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Image.asset('images/logo.png', height: 100),
+                const SizedBox(height: 16),
+                const Text('SafeChain', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                const Text('Your digital safety keychain', style: TextStyle(fontSize: 16, color: Colors.grey)),
                 const SizedBox(height: 32),
                 _buildSignupForm(context),
               ],
