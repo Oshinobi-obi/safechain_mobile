@@ -18,6 +18,7 @@ class PhoneNumberInput extends StatelessWidget {
     return TextFormField(
       controller: controller,
       keyboardType: TextInputType.phone,
+      autovalidateMode: AutovalidateMode.onUserInteraction,
       inputFormatters: [
         FilteringTextInputFormatter.digitsOnly,
         LengthLimitingTextInputFormatter(10),
@@ -69,22 +70,30 @@ class _PhoneNumberFormatter extends TextInputFormatter {
     TextEditingValue oldValue,
     TextEditingValue newValue,
   ) {
-    final text = newValue.text;
-    if (newValue.selection.baseOffset == 0) {
-      return newValue;
+    final String digitsOnly = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    final int textLength = digitsOnly.length;
+
+    if (textLength == 0) {
+      return const TextEditingValue();
     }
 
-    final buffer = StringBuffer();
-    for (int i = 0; i < text.length; i++) {
-      buffer.write(text[i]);
-      if ((i == 2 || i == 5) && i != text.length - 1) {
-        buffer.write('-');
-      }
+    final StringBuffer buffer = StringBuffer();
+    if (textLength > 0) {
+      buffer.write(digitsOnly.substring(0, textLength.clamp(0, 3)));
     }
-
+    if (textLength > 3) {
+      buffer.write('-');
+      buffer.write(digitsOnly.substring(3, textLength.clamp(3, 6)));
+    }
+    if (textLength > 6) {
+      buffer.write('-');
+      buffer.write(digitsOnly.substring(6, textLength.clamp(6, 10)));
+    }
+    
     String newText = buffer.toString();
-    return newValue.copyWith(
-        text: newText,
-        selection: TextSelection.collapsed(offset: newText.length));
+    return TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: newText.length),
+    );
   }
 }

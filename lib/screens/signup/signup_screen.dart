@@ -171,6 +171,7 @@ class _SignupScreenState extends State<SignupScreen> {
               TextFormField(
                 controller: _fullNameController,
                 decoration: InputDecoration(label: _buildRequiredLabel('Full Name'), hintText: 'Enter your full name'),
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'This field cannot be empty';
                   return null;
@@ -180,6 +181,7 @@ class _SignupScreenState extends State<SignupScreen> {
               TextFormField(
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 decoration: InputDecoration(label: _buildRequiredLabel('Email'), hintText: 'Enter your email address'),
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'This field cannot be empty';
@@ -190,6 +192,7 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _addressController,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 decoration: InputDecoration(label: _buildRequiredLabel('Complete Address'), hintText: 'Enter your complete address'),
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'This field cannot be empty';
@@ -202,6 +205,7 @@ class _SignupScreenState extends State<SignupScreen> {
               TextFormField(
                 controller: _passwordController,
                 obscureText: _obscurePassword,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 decoration: InputDecoration(
                   label: _buildRequiredLabel('Password'),
                   hintText: 'Enter your password',
@@ -229,10 +233,11 @@ class _SignupScreenState extends State<SignupScreen> {
               TextFormField(
                 controller: _confirmPasswordController,
                 obscureText: _obscureConfirmPassword,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 decoration: InputDecoration(
                   label: _buildRequiredLabel('Confirm Password'),
                   hintText: 'Re-enter your password',
-                  errorText: _confirmPasswordController.text.isNotEmpty && _passwordController.text != _passwordController.text ? 'Passwords do not match' : null,
+                  errorText: _confirmPasswordController.text.isNotEmpty && _passwordController.text != _confirmPasswordController.text ? 'Passwords do not match' : null,
                   suffixIcon: IconButton(
                     icon: Icon(_obscureConfirmPassword ? Icons.visibility : Icons.visibility_off),
                     onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
@@ -247,6 +252,7 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _emergencyNameController,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 decoration: InputDecoration(label: _buildRequiredLabel('Emergency Contact Person Name'), hintText: 'Enter name'),
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'This field cannot be empty';
@@ -258,6 +264,7 @@ class _SignupScreenState extends State<SignupScreen> {
               const SizedBox(height: 16),
               TextFormField(
                 controller: _emergencyAddressController,
+                autovalidateMode: AutovalidateMode.onUserInteraction,
                 decoration: InputDecoration(label: _buildRequiredLabel('Emergency Contact Address'), hintText: 'Enter address'),
                 validator: (value) {
                   if (value == null || value.isEmpty) return 'This field cannot be empty';
