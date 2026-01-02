@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:safechain/screens/login/login_screen.dart';
+import 'package:safechain/screens/welcome/welcome_screen.dart';
 
 class StartupScreen extends StatefulWidget {
   const StartupScreen({super.key});
@@ -27,10 +29,28 @@ class _StartupScreenState extends State<StartupScreen> with SingleTickerProvider
 
     _controller.forward();
 
+    _navigateToNext();
+  }
+
+  Future<void> _navigateToNext() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('email');
+    final password = prefs.getString('password');
+
     Timer(const Duration(seconds: 3), () {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-      );
+      if (mounted) {
+        if (email != null && password != null) {
+          // If Remember Me is enabled, go to Login for auto-login
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const LoginScreen()),
+          );
+        } else {
+          // Otherwise, show the Welcome Screen
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const WelcomeScreen()),
+          );
+        }
+      }
     });
   }
 
