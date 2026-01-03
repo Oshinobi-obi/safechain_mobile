@@ -321,7 +321,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                     ),
                                     child: _isLoading
                                         ? const CircularProgressIndicator(color: Colors.white)
-                                        : const Text('Register', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+                                        : const Text('Sign Up', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
                                   ),
                                   const SizedBox(height: 40),
                                   Row(

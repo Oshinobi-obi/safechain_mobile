@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
-import 'package:location/location.dart';
-import 'package:safechain/screens/crime/crime_screen.dart';
-import 'package:safechain/screens/emergency_sos/emergency_sos_screen.dart';
+import 'package:safechain/screens/add_device/add_device_flow.dart';
+import 'package:safechain/screens/guide/guide_screen.dart';
 import 'package:safechain/screens/profile/profile_screen.dart';
-import 'package:safechain/widgets/curved_app_bar.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,12 +15,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   Map<String, dynamic>? _userData;
-
-  final List<IconData> _avatars = const [
-    Icons.person, Icons.face, Icons.account_circle, Icons.star,
-    Icons.shield, Icons.home, Icons.pets, Icons.favorite,
-    Icons.eco, Icons.public, Icons.anchor, Icons.bug_report,
-  ];
 
   @override
   void initState() {
@@ -45,9 +35,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onItemTapped(int index) {
-    if (_selectedIndex == index && index == 1) {
-       _fetchUserData();
-    } 
     setState(() {
       _selectedIndex = index;
     });
@@ -56,285 +43,304 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> widgetOptions = <Widget>[
-      HomeContent(userData: _userData, avatars: _avatars),
+      DevicesContent(userData: _userData),
+      const GuideScreen(),
       const ProfileScreen(),
     ];
 
-    final String displayName = _userData?['full_name']?.split(' ').first ?? 'User';
-
-    final List<PreferredSizeWidget> appBars = <PreferredSizeWidget>[
-      CurvedAppBar(
-        title: Text('Hi, $displayName!', style: const TextStyle(color: Colors.white, fontSize: 24)),
-        bottom: const Text('Welcome back to SafeChain', style: TextStyle(color: Colors.white, fontSize: 16)),
-      ),
-      const CurvedAppBar(
-        title: Text('Profile', style: TextStyle(color: Colors.white, fontSize: 24)),
-        bottom: Text('Your Profile Information', style: TextStyle(color: Colors.white, fontSize: 16)),
-      ),
-    ];
-
     return Scaffold(
-      appBar: appBars[_selectedIndex],
-      body: Center(
-        child: widgetOptions.elementAt(_selectedIndex),
-      ),
-      bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
-        ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: const Color(0xFF20C997),
-        onTap: _onItemTapped,
+      backgroundColor: const Color(0xFFF8FAFC),
+      body: widgetOptions.elementAt(_selectedIndex),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          items: [
+            BottomNavigationBarItem(
+              icon: Image.asset(_selectedIndex == 0 ? 'images/mobile-active.png' : 'images/mobile-inactive.png', width: 24, height: 24),
+              label: 'Devices',
+            ),
+            BottomNavigationBarItem(
+              icon: Image.asset(_selectedIndex == 1 ? 'images/guide-active.png' : 'images/guide-inactive.png', width: 24, height: 24),
+              label: 'Guide',
+            ),
+            BottomNavigationBarItem(
+              icon: Image.asset(_selectedIndex == 2 ? 'images/profile-active.png' : 'images/profile-inactive.png', width: 24, height: 24),
+              label: 'Profile',
+            ),
+          ],
+          currentIndex: _selectedIndex,
+          selectedItemColor: const Color(0xFF20C997),
+          unselectedItemColor: Colors.grey,
+          showUnselectedLabels: true,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          elevation: 0,
+          onTap: _onItemTapped,
+        ),
       ),
     );
   }
 }
 
-class HomeContent extends StatefulWidget {
+class DevicesContent extends StatelessWidget {
   final Map<String, dynamic>? userData;
-  final List<IconData> avatars;
-  const HomeContent({super.key, this.userData, required this.avatars});
-
-  @override
-  State<HomeContent> createState() => _HomeContentState();
-}
-
-class _HomeContentState extends State<HomeContent> {
-  LocationData? _currentLocation;
-  late final MapController _mapController;
-  bool _isSatellite = false;
-
-  final List<LatLng> _gulodBoundary = [
-    LatLng(14.7195, 121.0350),
-    LatLng(14.7180, 121.0420),
-    LatLng(14.7080, 121.0450),
-    LatLng(14.7065, 121.0370),
-  ];
-
-  @override
-  void initState() {
-    super.initState();
-    _mapController = MapController();
-    _requestLocationPermission();
-  }
-
-  Future<void> _requestLocationPermission() async {
-    final location = Location();
-    bool serviceEnabled;
-    PermissionStatus permissionGranted;
-
-    serviceEnabled = await location.serviceEnabled();
-    if (!serviceEnabled) {
-      serviceEnabled = await location.requestService();
-      if (!serviceEnabled) return;
-    }
-
-    permissionGranted = await location.hasPermission();
-    if (permissionGranted == PermissionStatus.denied) {
-      permissionGranted = await location.requestPermission();
-      if (permissionGranted != PermissionStatus.granted) return;
-    }
-
-    final locationData = await location.getLocation();
-    if (mounted) {
-      setState(() {
-        _currentLocation = locationData;
-      });
-    }
-  }
-
-  void _recenterMap() {
-      if (_currentLocation != null) {
-          _mapController.move(LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!), 15.0);
-      }
-  }
-
-  void _toggleMapStyle() {
-    setState(() {
-      _isSatellite = !_isSatellite;
-    });
-  }
+  const DevicesContent({super.key, this.userData});
 
   @override
   Widget build(BuildContext context) {
-    final avatarIndex = widget.userData?['avatar_index'];
+    final String fullName = userData?['full_name'] ?? 'User';
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24.0),
       child: Column(
         children: [
-          const DeviceRegistration(),
-          const SizedBox(height: 24),
-          SizedBox(
-            height: 300,
-            child: Stack(
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12.0),
-                    boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.5), spreadRadius: 5, blurRadius: 7, offset: const Offset(0, 3))],
-                    border: Border.all(color: Colors.grey[300]!, width: 2),
+          // Header Section
+          Stack(
+            children: [
+              Container(
+                height: 420, 
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  color: Color(0xFF20C997),
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(40),
+                    bottomRight: Radius.circular(40),
                   ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10.0),
-                    child: FlutterMap(
-                      mapController: _mapController,
-                      options: MapOptions(
-                        initialCenter: const LatLng(14.7120, 121.0387),
-                        initialZoom: 14.0,
-                      ),
+                ),
+              ),
+              // Background Circles (Light Decorative Elements)
+              Positioned(
+                top: -50,
+                right: -50,
+                child: Container(
+                  width: 250,
+                  height: 250,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 20,
+                left: -60,
+                child: Container(
+                  width: 200,
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 60, 24, 32),
+                child: Column(
+                  children: [
+                    // Top Row: Logo (left) and Bell (right)
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        TileLayer(
-                          urlTemplate: _isSatellite 
-                            ? 'https://api.maptiler.com/maps/satellite/{z}/{x}/{y}.jpg?key=uMG221O3FCXWR3ts0EqP'
-                            : 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.png?key=uMG221O3FCXWR3ts0EqP',
-                          userAgentPackageName: 'com.safechain.app',
-                        ),
-                        PolygonLayer(
-                          polygons: [
-                            Polygon(
-                              points: _gulodBoundary,
-                              color: Colors.blue.withOpacity(0.1),
-                              borderColor: Colors.blue,
-                              borderStrokeWidth: 3,
+                        Row(
+                          children: [
+                            Image.asset('images/logo.png', height: 50),
+                            const SizedBox(width: 12),
+                            const Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('SafeChain', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 20)),
+                                Text('Residents', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                              ],
                             ),
                           ],
                         ),
-                        if (_currentLocation != null)
-                          MarkerLayer(
-                            markers: [
-                              Marker(
-                                point: LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!),
-                                width: 50,
-                                height: 50,
-                                child: CircleAvatar(
-                                  radius: 25,
-                                  backgroundColor: Colors.white,
-                                  child: CircleAvatar(
-                                    radius: 23,
-                                    backgroundColor: Colors.grey.shade400,
-                                    child: (avatarIndex != null && avatarIndex >= 0 && avatarIndex < widget.avatars.length)
-                                      ? Icon(widget.avatars[avatarIndex], size: 30, color: Colors.white)
-                                      : const Icon(Icons.person, size: 30, color: Colors.white),
-                                  ),
-                                ),
+                        Stack(
+                          clipBehavior: Clip.none,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(15),
                               ),
-                            ],
-                          )
+                              child: Image.asset('images/Bell.png', height: 24, color: Colors.white),
+                            ),
+                            Positioned(
+                              right: -4,
+                              top: -4,
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: const BoxDecoration(color: Color(0xFFF87171), shape: BoxShape.circle),
+                                child: const Text('3', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ),
+                            ),
+                          ],
+                        ),
                       ],
                     ),
-                  ),
-                ),
-                Positioned(
-                    bottom: 10,
-                    right: 10,
-                    child: FloatingActionButton(
-                        heroTag: 'recenter',
-                        onPressed: _recenterMap,
-                        mini: true,
-                        child: const Icon(Icons.my_location),
+                    const SizedBox(height: 30),
+                    // Middle Row: Welcome text aligned with Profile icon
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Welcome back,', style: TextStyle(color: Colors.white70, fontSize: 18)),
+                              Text(
+                                fullName,
+                                style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Container(
+                          padding: const EdgeInsets.all(2),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
+                          ),
+                          child: const CircleAvatar(
+                            radius: 35, 
+                            backgroundColor: Colors.white30,
+                            backgroundImage: AssetImage('images/profile-picture.png'),
+                          ),
+                        ),
+                      ],
                     ),
-                ),
-                Positioned(
-                    bottom: 60,
-                    right: 10,
-                    child: FloatingActionButton(
-                        heroTag: 'toggleStyle',
-                        onPressed: _toggleMapStyle,
-                        mini: true,
-                        child: Icon(_isSatellite ? Icons.map : Icons.satellite),
+                    const SizedBox(height: 40),
+                    // Bottom: Summary Card
+                    Container(
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(25),
+                        border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Total Devices', style: TextStyle(color: Colors.white70, fontSize: 16)),
+                              Text('1', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (context) => const AddDeviceFlow()));
+                            },
+                            icon: const Icon(Icons.add, color: Color(0xFF20C997), size: 20),
+                            label: const Text('Add Device', style: TextStyle(color: Color(0xFF20C997), fontWeight: FontWeight.bold)),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                              elevation: 0,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                )
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          // Device List
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24),
+            child: Column(
+              children: [
+                _buildDeviceCard(context, 'Safechain001', 'SC-KC-001', '98%'),
               ],
             ),
           ),
-          const SizedBox(height: 24),
-          const PersonalSafetySection(),
         ],
       ),
     );
   }
-}
 
-class DeviceRegistration extends StatelessWidget {
-  const DeviceRegistration({super.key});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildDeviceCard(BuildContext context, String name, String id, String battery) {
     return Container(
-      padding: const EdgeInsets.all(24.0),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12.0),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.2), spreadRadius: 5, blurRadius: 7, offset: const Offset(0, 3))],
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Device Registration', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          const TextField(decoration: InputDecoration(hintText: 'Enter your serial number', labelText: 'Serial Number')),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {},
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF20C997),
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
-            ),
-            child: const Text('Register Device', style: TextStyle(fontSize: 18, color: Colors.white)),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class PersonalSafetySection extends StatelessWidget {
-  const PersonalSafetySection({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12.0),
-        boxShadow: [BoxShadow(color: Colors.grey.withOpacity(0.2), spreadRadius: 5, blurRadius: 7, offset: const Offset(0, 3))],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('PERSONAL SAFETY', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-          const SizedBox(height: 8),
-          const Text('Explore ways to get help'),
-          const Text('Try demos or set up Personal Safety features', style: TextStyle(color: Colors.grey)),
-          const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildSafetyButton(context, 'Emergency SOS', 'images/emergency.png', () {
-                Navigator.of(context).push(MaterialPageRoute(builder: (context) => const EmergencySosScreen()));
-              }),
-              _buildSafetyButton(context, 'Crime', 'images/crime.png', () {
-                Navigator.of(context).push(MaterialPageRoute(builder: (context) => const CrimeScreen()));
-              }),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(color: const Color(0xFFE6F9F3), borderRadius: BorderRadius.circular(15)),
+                child: Image.asset('images/mobile-active.png', width: 28),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    Text('ID: $id', style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                  ],
+                ),
+              ),
+              Row(
+                children: [
+                  Text(battery, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+                  const SizedBox(width: 6),
+                  Image.asset('images/battery-green.png', width: 28),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSafetyButton(BuildContext context, String label, String imagePath, VoidCallback onPressed) {
-    return InkWell(
-      onTap: onPressed,
-      child: Column(
-        children: [
-          Image.asset(imagePath, height: 50),
-          const SizedBox(height: 8),
-          Text(label),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () {},
+                  icon: Image.asset('images/gps-icon.png', width: 20, color: Colors.white),
+                  label: const Text('Test GPS', style: TextStyle(color: Colors.white, fontSize: 16)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF20C997),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: () {},
+                  icon: Image.asset('images/gear-icon.png', width: 20, color: Colors.grey),
+                  label: const Text('Settings', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    side: BorderSide(color: Colors.grey.shade200, width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );

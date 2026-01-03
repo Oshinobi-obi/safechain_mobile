@@ -3,9 +3,9 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:safechain/screens/edit_profile/edit_profile_screen.dart';
 import 'package:safechain/screens/login/login_screen.dart';
-import 'package:safechain/modals/success_modal.dart';
+import 'package:safechain/screens/profile/personal_information_screen.dart';
+import 'package:safechain/screens/profile/emergency_contacts_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -18,13 +18,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   User? _user;
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
+  bool _notificationsEnabled = true;
   StreamSubscription<User?>? _authSubscription;
-
-  final List<IconData> _avatars = const [
-    Icons.person, Icons.face, Icons.account_circle, Icons.star,
-    Icons.shield, Icons.home, Icons.pets, Icons.favorite,
-    Icons.eco, Icons.public, Icons.anchor, Icons.bug_report,
-  ];
 
   @override
   void initState() {
@@ -50,81 +45,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  String _formatPhoneNumber(String? phoneNumber) {
-    if (phoneNumber == null || phoneNumber.length != 10) {
-      return phoneNumber ?? 'N/A';
-    }
-    return '+63 ${phoneNumber.substring(0, 3)}-${phoneNumber.substring(3, 6)}-${phoneNumber.substring(6)}';
-  }
-
-  Future<void> _selectAvatar() async {
-    final int? selectedIndex = await showDialog<int>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Select an Avatar'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: GridView.builder(
-              shrinkWrap: true,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 4,
-                crossAxisSpacing: 10,
-                mainAxisSpacing: 10,
-              ),
-              itemCount: _avatars.length,
-              itemBuilder: (context, index) {
-                return InkWell(
-                  onTap: () {
-                    Navigator.of(context).pop(index);
-                  },
-                  child: Icon(_avatars[index], size: 40, color: Colors.black54),
-                );
-              },
-            ),
-          ),
-        );
-      },
-    );
-
-    if (selectedIndex != null) {
-      try {
-        await FirebaseFirestore.instance.collection('residents').doc(_user!.uid).update({
-          'avatar_index': selectedIndex,
-          'profile_picture_url': null,
-          'avatar_codepoint': null,
-        });
-
-        if (mounted) {
-          setState(() {
-            _userData!['avatar_index'] = selectedIndex;
-            _userData!.remove('profile_picture_url');
-            _userData!.remove('avatar_codepoint');
-          });
-        }
-      } on FirebaseException catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("Failed to save avatar: ${e.message}")),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _sendVerificationEmail() async {
-    if (_user != null && !_user!.emailVerified) {
-      await _user!.sendEmailVerification();
-      showDialog(
-        context: context,
-        builder: (context) => const SuccessModal(
-          title: 'Verification Email Sent',
-          message: 'A verification email has been sent. Please check your inbox.',
-        ),
-      );
-    }
-  }
-
   Future<void> _confirmAndLogout() async {
     final bool? confirm = await showDialog(
       context: context,
@@ -145,9 +65,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('email');
       await prefs.remove('password');
-      
       await FirebaseAuth.instance.signOut();
-      
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const LoginScreen()),
@@ -165,160 +83,200 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return _isLoading
-        ? const Center(child: CircularProgressIndicator())
-        : SingleChildScrollView(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              children: [
-                _buildProfileHeader(),
-                const SizedBox(height: 16),
-                _buildEmailVerificationStatus(),
-                const SizedBox(height: 24),
-                _buildPersonalInfoSection(),
-                const SizedBox(height: 16),
-                _buildProfileInfo(),
-                const SizedBox(height: 32),
-                _buildLogoutButton(),
-              ],
-            ),
-          );
-  }
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-  Widget _buildProfileHeader() {
-    final avatarIndex = _userData?['avatar_index'];
-    final initials = _userData?['full_name']?.substring(0, 2).toUpperCase() ?? 'N/A';
+    final String fullName = _userData?['full_name'] ?? 'User';
+    final String userId = 'USR-2025-001';
 
-    return Center(
-      child: Stack(
-        children: [
-          CircleAvatar(
-            radius: 50,
-            backgroundColor: Colors.grey.shade400,
-            child: (avatarIndex != null && avatarIndex >= 0 && avatarIndex < _avatars.length)
-                ? Icon(_avatars[avatarIndex], size: 60, color: Colors.white)
-                : Text(initials, style: const TextStyle(fontSize: 40, color: Colors.white)),
-          ),
-          Positioned(
-            bottom: 0,
-            right: 0,
-            child: InkWell(
-              onTap: _selectAvatar,
-              child: CircleAvatar(
-                radius: 15,
-                backgroundColor: Colors.grey[200],
-                child: const Icon(Icons.edit, size: 15),
+    return Container(
+      color: const Color(0xFFF8FAFC),
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            // Header Section
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(24, 60, 24, 40),
+              decoration: const BoxDecoration(
+                color: Color(0xFF20C997),
+                borderRadius: BorderRadius.only(
+                  bottomLeft: Radius.circular(40),
+                  bottomRight: Radius.circular(40),
+                ),
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                    ),
+                    child: const CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.white30,
+                      backgroundImage: AssetImage('images/profile-picture.png'),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    fullName,
+                    style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'User ID: $userId',
+                    style: const TextStyle(color: Colors.white70, fontSize: 14),
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmailVerificationStatus() {
-    final isVerified = _user?.emailVerified ?? false;
-
-    return Column(
-      children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: isVerified ? Colors.green : Colors.red, width: 1),
-          ),
-          child: Text(
-            isVerified ? 'Email Verified' : 'Email not yet verified!',
-            style: TextStyle(color: isVerified ? Colors.green : Colors.red, fontWeight: FontWeight.bold),
-          ),
-        ),
-        if (!isVerified)
-          const SizedBox(height: 8),
-        if (!isVerified)
-          SizedBox(
-            height: 30,
-            child: ElevatedButton(
-              onPressed: _sendVerificationEmail,
-              child: const Text('Verify Email'),
+            
+            const SizedBox(height: 24),
+            
+            _buildSectionHeader('General'),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))],
+              ),
+              child: Column(
+                children: [
+                  _buildMenuItem('Personal Information', 'images/user-blue.png', () {
+                    if (_userData != null) {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => PersonalInformationScreen(userData: _userData!),
+                        ),
+                      ).then((_) {
+                        if (_user != null) _fetchUserData(_user!);
+                      });
+                    }
+                  }),
+                  _buildMenuItem('Emergency Contacts', 'images/phone-red.png', () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EmergencyContactsScreen(),
+                      ),
+                    );
+                  }),
+                  _buildMenuItem('Change Password', 'images/lock-yellow.png', () {}),
+                  _buildMenuItem('Privacy Policy', 'images/document-green.png', () {}),
+                  _buildMenuItem('Terms of Use', 'images/document-orange.png', () {}),
+                  _buildSwitchItem('Notifications', 'images/bell-purple.png'),
+                ],
+              ),
             ),
-          )
-      ],
-    );
-  }
 
-  Widget _buildPersonalInfoSection() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        const Text('Personal Information', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        IconButton(
-          icon: const Icon(Icons.edit),
-          onPressed: () {
-            if (_user != null && _userData != null) {
-              Navigator.of(context).push(
-                MaterialPageRoute(builder: (context) => EditProfileScreen(userData: _userData!)),
-              ).then((_) => _fetchUserData(_user!));
-            }
-          },
+            const SizedBox(height: 24),
+
+            _buildSectionHeader('About'),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 5))],
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
+                    child: Image.asset('images/warning-gray.png', width: 24),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Text('App Version', style: TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                  const Text('1.0.0', style: TextStyle(color: Colors.grey)),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 32),
+
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: ElevatedButton(
+                onPressed: _confirmAndLogout,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFF87171),
+                  minimumSize: const Size(double.infinity, 60),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  elevation: 0,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Image.asset('images/logout-icon.png', width: 24, color: Colors.white),
+                    const SizedBox(width: 12),
+                    const Text('Logout', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 40),
+          ],
         ),
-      ],
-    );
-  }
-
-  Widget _buildProfileInfo() {
-    return Column(
-      children: [
-        InfoRow(icon: Icons.person, label: 'Full Name', value: _userData?['full_name'] ?? 'N/A'),
-        InfoRow(icon: Icons.email, label: 'Email', value: _userData?['email'] ?? 'N A'),
-        InfoRow(icon: Icons.location_on, label: 'Complete Address', value: _userData?['address'] ?? 'N/A'),
-        InfoRow(icon: Icons.phone, label: 'Contact Number', value: _formatPhoneNumber(_userData?['contact_number'])),
-        const Divider(height: 32),
-        InfoRow(icon: Icons.contact_mail, label: 'Emergency Contact Name', value: _userData?['emergency_contact_person_name'] ?? 'N/A'),
-        InfoRow(icon: Icons.phone, label: 'Emergency Contact Number', value: _formatPhoneNumber(_userData?['emergency_contact_number'])),
-        InfoRow(icon: Icons.location_on, label: 'Emergency Contact Address', value: _userData?['emergency_contact_address'] ?? 'N/A'),
-      ],
-    );
-  }
-
-  Widget _buildLogoutButton() {
-    return ElevatedButton(
-      onPressed: _confirmAndLogout,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: const Color(0xFF20C997),
-        minimumSize: const Size(double.infinity, 50),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.0)),
       ),
-      child: const Text('Logout', style: TextStyle(fontSize: 18, color: Colors.white)),
     );
   }
-}
 
-class InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const InfoRow({super.key, required this.icon, required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildSectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Icon(icon, color: const Color(0xFF20C997)),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(value, overflow: TextOverflow.ellipsis),
-              ],
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.fromLTRB(24, 0, 24, 12),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Text(
+          title,
+          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.grey),
+        ),
       ),
+    );
+  }
+
+  Widget _buildMenuItem(String title, String iconPath, VoidCallback onTap) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Image.asset(iconPath, width: 28),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+      trailing: const Icon(Icons.chevron_right, color: Colors.black),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildSwitchItem(String title, String iconPath) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Image.asset(iconPath, width: 28),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+      trailing: Switch(
+        value: _notificationsEnabled,
+        onChanged: (val) => setState(() => _notificationsEnabled = val),
+        activeColor: const Color(0xFF20C997),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
 }

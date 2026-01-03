@@ -64,6 +64,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (mounted) {
+        // Navigate to Home Screen after login
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
@@ -114,7 +115,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Column(
                   children: [
-                    const SizedBox(height: 40), // Increased height to replace back button space
+                    const SizedBox(height: 40),
                     Stack(
                       clipBehavior: Clip.none,
                       children: [
@@ -247,7 +248,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                     children: [
                                       const Text('Don\'t have an account? '),
                                       GestureDetector(
-                                        onTap: () => Navigator.pushReplacement(
+                                        onTap: () => Navigator.push(
                                           context,
                                           MaterialPageRoute(builder: (context) => const SignupScreen()),
                                         ),
