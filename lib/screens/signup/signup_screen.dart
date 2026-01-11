@@ -62,12 +62,6 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _handleSignup() async {
     if (!_formKey.currentState!.validate()) return;
-    if (!_agreedToTerms) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please agree to the Terms and Policy')),
-      );
-      return;
-    }
 
     setState(() => _isLoading = true);
 
@@ -311,9 +305,9 @@ class _SignupScreenState extends State<SignupScreen> {
                                   ),
                                   const SizedBox(height: 32),
                                   ElevatedButton(
-                                    onPressed: _isLoading ? null : _handleSignup,
+                                    onPressed: _agreedToTerms && !_isLoading ? _handleSignup : null,
                                     style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFF20C997),
+                                      backgroundColor: _agreedToTerms ? const Color(0xFF20C997) : Colors.grey,
                                       minimumSize: const Size(double.infinity, 56),
                                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
                                       elevation: 0,
