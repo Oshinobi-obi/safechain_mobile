@@ -226,7 +226,6 @@ class _SignupScreenState extends State<SignupScreen> {
                                       suffixIcon: IconButton(
                                         icon: SvgPicture.asset(
                                           _obscurePassword ? 'images/password-hidden.svg' : 'images/password-show.svg',
-                                          width: 24,
                                         ),
                                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                                       ),
@@ -269,7 +268,6 @@ class _SignupScreenState extends State<SignupScreen> {
                                       suffixIcon: IconButton(
                                         icon: SvgPicture.asset(
                                           _obscureConfirmPassword ? 'images/password-hidden.svg' : 'images/password-show.svg',
-                                          width: 24,
                                         ),
                                         onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                                       ),

@@ -185,7 +185,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                       suffixIcon: IconButton(
                                         icon: SvgPicture.asset(
                                           _obscurePassword ? 'images/password-hidden.svg' : 'images/password-show.svg',
-                                          width: 24,
                                         ),
                                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                                       ),
