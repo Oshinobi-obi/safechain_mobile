@@ -65,52 +65,54 @@ class EnableBluetoothStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(),
-          CircleAvatar(
-            radius: 60,
-            backgroundColor: const Color(0xFFD1E9FF),
-            child: Image.asset('images/bluetooth-icon.png', width: 60),
-          ),
-          const SizedBox(height: 40),
-          const Text('Enable Bluetooth', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          const Text(
-            'We need Bluetooth access to connect to your emergency device',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: Colors.black87),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'This allows your phone to communicate with the device',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-          ),
-          const Spacer(),
-          ElevatedButton(
-            onPressed: onEnable,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF20C997),
-              minimumSize: const Size(double.infinity, 56),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Spacer(),
+            CircleAvatar(
+              radius: 60,
+              backgroundColor: const Color(0xFFD1E9FF),
+              child: Image.asset('images/bluetooth-icon.png', width: 60),
             ),
-            child: const Text('Enable', style: TextStyle(fontSize: 18, color: Colors.white)),
-          ),
-          const SizedBox(height: 16),
-          TextButton(
-            onPressed: onSkip,
-            style: TextButton.styleFrom(
-              minimumSize: const Size(double.infinity, 56),
-              backgroundColor: const Color(0xFFF1F5F9),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            const SizedBox(height: 40),
+            const Text('Enable Bluetooth', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            const Text(
+              'We need Bluetooth access to connect to your emergency device',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.black87),
             ),
-            child: const Text('Skip for Now', style: TextStyle(fontSize: 18, color: Colors.grey)),
-          ),
-        ],
+            const SizedBox(height: 8),
+            const Text(
+              'This allows your phone to communicate with the device',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+            const Spacer(),
+            ElevatedButton(
+              onPressed: onEnable,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF20C997),
+                minimumSize: const Size(double.infinity, 56),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              ),
+              child: const Text('Enable', style: TextStyle(fontSize: 18, color: Colors.white)),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: onSkip,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(double.infinity, 56),
+                backgroundColor: const Color(0xFFF1F5F9),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              ),
+              child: const Text('Skip for Now', style: TextStyle(fontSize: 18, color: Colors.grey)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -132,36 +134,38 @@ class PairYourDeviceStep extends StatelessWidget {
         elevation: 0,
         foregroundColor: Colors.black,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            CircleAvatar(
-              radius: 50,
-              backgroundColor: const Color(0xFFE6F9F3),
-              child: Image.asset('images/hotspot-icon.png', width: 50, color: const Color(0xFF20C997)),
-            ),
-            const SizedBox(height: 32),
-            const Text('Pair Your Device', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text('Follow the steps to connect your keychain device', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 40),
-            _buildStep(1, 'Power On Device', 'Hold power button for 3 seconds.', 'images/circle-power.png'),
-            const SizedBox(height: 16),
-            _buildStep(2, 'Wait for LED', 'Device LED should start blinking.', 'images/lightbulb-icon.png'),
-            const SizedBox(height: 16),
-            _buildStep(3, 'Start Pairing', 'You are good to go.', 'images/star-icon.png'),
-            const Spacer(),
-            ElevatedButton(
-              onPressed: onStart,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF20C997),
-                minimumSize: const Size(double.infinity, 56),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 50,
+                backgroundColor: const Color(0xFFE6F9F3),
+                child: Image.asset('images/hotspot-icon.png', width: 50, color: const Color(0xFF20C997)),
               ),
-              child: const Text('Start Pairing', style: TextStyle(fontSize: 18, color: Colors.white)),
-            ),
-          ],
+              const SizedBox(height: 32),
+              const Text('Pair Your Device', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('Follow the steps to connect your keychain device', style: TextStyle(color: Colors.grey)),
+              const SizedBox(height: 40),
+              _buildStep(1, 'Power On Device', 'Hold power button for 3 seconds.', 'images/circle-power.png'),
+              const SizedBox(height: 16),
+              _buildStep(2, 'Wait for LED', 'Device LED should start blinking.', 'images/lightbulb-icon.png'),
+              const SizedBox(height: 16),
+              _buildStep(3, 'Start Pairing', 'You are good to go.', 'images/star-icon.png'),
+              const Spacer(),
+              ElevatedButton(
+                onPressed: onStart,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF20C997),
+                  minimumSize: const Size(double.infinity, 56),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                ),
+                child: const Text('Start Pairing', style: TextStyle(fontSize: 18, color: Colors.white)),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -231,6 +235,7 @@ class _ScanningStepState extends State<ScanningStep> with SingleTickerProviderSt
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: widget.onCancel),
         title: const Text('Scanning'),
         centerTitle: true,
         actions: [TextButton(onPressed: widget.onCancel, child: const Text('CANCEL', style: TextStyle(color: Colors.grey)))],
@@ -238,82 +243,84 @@ class _ScanningStepState extends State<ScanningStep> with SingleTickerProviderSt
         elevation: 0,
         foregroundColor: Colors.black,
       ),
-      body: Center(
-        child: Column(
-          children: [
-            const SizedBox(height: 40),
-            AnimatedBuilder(
-              animation: _controller,
-              builder: (context, child) {
-                return Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    for (var i = 0; i < 3; i++)
-                      Transform.scale(
-                        scale: 1 + (_controller.value + i / 3) % 1 * 1.5,
-                        child: Container(
-                          width: 100,
-                          height: 100,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: const Color(0xFF20C997).withOpacity(0.3 * (1 - (_controller.value + i / 3) % 1)),
+      body: SafeArea(
+        child: Center(
+          child: Column(
+            children: [
+              const SizedBox(height: 100), // Increased top spacing
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  return Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      for (var i = 0; i < 3; i++)
+                        Transform.scale(
+                          scale: 1 + (_controller.value + i / 3) % 1 * 1.5,
+                          child: Container(
+                            width: 100,
+                            height: 100,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: const Color(0xFF20C997).withOpacity(0.3 * (1 - (_controller.value + i / 3) % 1)),
+                            ),
                           ),
                         ),
-                      ),
-                    CircleAvatar(
-                      radius: 50,
-                      backgroundColor: const Color(0xFFE6F9F3),
-                      child: Image.asset('images/hotspot-icon.png', width: 50, color: const Color(0xFF20C997)),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 40),
-            const Text('Searching for devices', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            const Text('Please wait...', style: TextStyle(color: Colors.grey)),
-            const SizedBox(height: 60),
-            // Simulated found device
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: InkWell(
-                onTap: widget.onFound,
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
-                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(color: const Color(0xFFE6F9F3), borderRadius: BorderRadius.circular(12)),
-                        child: Image.asset('images/hotspot-icon.png', width: 24, color: const Color(0xFF20C997)),
-                      ),
-                      const SizedBox(width: 16),
-                      const Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text('Safechain Device', style: TextStyle(fontWeight: FontWeight.bold)),
-                            Text('ID: SC-KC-002', style: TextStyle(color: Colors.grey, fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(color: const Color(0xFFE6F9F3), borderRadius: BorderRadius.circular(20)),
-                        child: const Text('Found', style: TextStyle(color: Color(0xFF20C997), fontSize: 12, fontWeight: FontWeight.bold)),
+                      CircleAvatar(
+                        radius: 50,
+                        backgroundColor: const Color(0xFFE6F9F3),
+                        child: Image.asset('images/hotspot-icon.png', width: 50, color: const Color(0xFF20C997)),
                       ),
                     ],
+                  );
+                },
+              ),
+              const SizedBox(height: 40),
+              const Text('Searching for devices', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text('Please wait...', style: TextStyle(color: Colors.grey)),
+              const SizedBox(height: 60),
+              // Simulated found device
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: InkWell(
+                  onTap: widget.onFound,
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(color: const Color(0xFFE6F9F3), borderRadius: BorderRadius.circular(12)),
+                          child: Image.asset('images/hotspot-icon.png', width: 24, color: const Color(0xFF20C997)),
+                        ),
+                        const SizedBox(width: 16),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Safechain Device', style: TextStyle(fontWeight: FontWeight.bold)),
+                              Text('ID: SC-KC-002', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(color: const Color(0xFFE6F9F3), borderRadius: BorderRadius.circular(20)),
+                          child: const Text('Found', style: TextStyle(color: Color(0xFF20C997), fontSize: 12, fontWeight: FontWeight.bold)),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -336,68 +343,70 @@ class SetUpDeviceStep extends StatelessWidget {
         elevation: 0,
         foregroundColor: Colors.black,
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(32),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE6F9F3),
-                borderRadius: BorderRadius.circular(20),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(32),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE6F9F3),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Column(
+                  children: [
+                    Image.asset('images/logo.png', height: 60),
+                    const SizedBox(height: 24),
+                    const Text('Safechain Device Found', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    const Text('ID: SC-KC-002', style: TextStyle(color: Colors.grey)),
+                  ],
+                ),
               ),
-              child: Column(
+              const SizedBox(height: 40),
+              const Text('Device Name', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              TextField(
+                decoration: InputDecoration(
+                  hintText: 'Safechain001',
+                  fillColor: const Color(0xFFF1F5F9),
+                  filled: true,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
+                ),
+              ),
+              const Spacer(),
+              Row(
                 children: [
-                  Image.asset('images/logo.png', height: 60),
-                  const SizedBox(height: 24),
-                  const Text('Safechain Device Found', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
-                  const Text('ID: SC-KC-002', style: TextStyle(color: Colors.grey)),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: onCancel,
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 56),
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      ),
+                      child: const Text('Cancel', style: TextStyle(fontSize: 18, color: Colors.grey)),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: onAdd,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF20C997),
+                        minimumSize: const Size(double.infinity, 56),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                      ),
+                      child: const Text('Add', style: TextStyle(fontSize: 18, color: Colors.white)),
+                    ),
+                  ),
                 ],
               ),
-            ),
-            const SizedBox(height: 40),
-            const Text('Device Name', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            TextField(
-              decoration: InputDecoration(
-                hintText: 'Safechain001',
-                fillColor: const Color(0xFFF1F5F9),
-                filled: true,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(30), borderSide: BorderSide.none),
-              ),
-            ),
-            const Spacer(),
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: onCancel,
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 56),
-                      backgroundColor: const Color(0xFFF1F5F9),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                    ),
-                    child: const Text('Cancel', style: TextStyle(fontSize: 18, color: Colors.grey)),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: onAdd,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF20C997),
-                      minimumSize: const Size(double.infinity, 56),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                    ),
-                    child: const Text('Add', style: TextStyle(fontSize: 18, color: Colors.white)),
-                  ),
-                ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -432,42 +441,44 @@ class _TestingGatewayStepState extends State<TestingGatewayStep> with SingleTick
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return Stack(
-                alignment: Alignment.center,
-                children: [
-                  for (var i = 0; i < 3; i++)
-                    Transform.scale(
-                      scale: 1 + (_controller.value + i / 3) % 1 * 1.5,
-                      child: Container(
-                        width: 100,
-                        height: 100,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: const Color(0xFFD1E9FF).withOpacity(0.3 * (1 - (_controller.value + i / 3) % 1)),
+    return SafeArea(
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            AnimatedBuilder(
+              animation: _controller,
+              builder: (context, child) {
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    for (var i = 0; i < 3; i++)
+                      Transform.scale(
+                        scale: 1 + (_controller.value + i / 3) % 1 * 1.5,
+                        child: Container(
+                          width: 100,
+                          height: 100,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFFD1E9FF).withOpacity(0.3 * (1 - (_controller.value + i / 3) % 1)),
+                          ),
                         ),
                       ),
+                    CircleAvatar(
+                      radius: 50,
+                      backgroundColor: const Color(0xFFD1E9FF),
+                      child: Image.asset('images/connection-icon.png', width: 50, color: const Color(0xFF007AFF)),
                     ),
-                  CircleAvatar(
-                    radius: 50,
-                    backgroundColor: const Color(0xFFD1E9FF),
-                    child: Image.asset('images/connection-icon.png', width: 50, color: const Color(0xFF007AFF)),
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 40),
-          const Text('Testing Gateway Connection', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          const Text('Connecting to LoRa network...', style: TextStyle(color: Colors.grey)),
-        ],
+                  ],
+                );
+              },
+            ),
+            const SizedBox(height: 40),
+            const Text('Testing Gateway Connection', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            const Text('Connecting to LoRa network...', style: TextStyle(color: Colors.grey)),
+          ],
+        ),
       ),
     );
   }
@@ -480,52 +491,54 @@ class AllSetStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(),
-          CircleAvatar(
-            radius: 60,
-            backgroundColor: const Color(0xFFE6F9F3),
-            child: Image.asset('images/hotspot-icon.png', width: 60, color: const Color(0xFF20C997)),
-          ),
-          const SizedBox(height: 40),
-          const Text('You’re All Set!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          const Text(
-            'Your device is connected and ready',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: Colors.black87),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'You can now test GPS location tracking',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Colors.grey),
-          ),
-          const Spacer(),
-          ElevatedButton(
-            onPressed: onTestGps,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF20C997),
-              minimumSize: const Size(double.infinity, 56),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Spacer(),
+            CircleAvatar(
+              radius: 60,
+              backgroundColor: const Color(0xFFE6F9F3),
+              child: Image.asset('images/hotspot-icon.png', width: 60, color: const Color(0xFF20C997)),
             ),
-            child: const Text('Test GPS Tracking', style: TextStyle(fontSize: 18, color: Colors.white)),
-          ),
-          const SizedBox(height: 16),
-          TextButton(
-            onPressed: onGoToDeviceList,
-            style: TextButton.styleFrom(
-              minimumSize: const Size(double.infinity, 56),
-              backgroundColor: const Color(0xFFF1F5F9),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            const SizedBox(height: 40),
+            const Text('You’re All Set!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            const Text(
+              'Your device is connected and ready',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.black87),
             ),
-            child: const Text('Go to device list', style: TextStyle(fontSize: 18, color: Colors.grey)),
-          ),
-        ],
+            const SizedBox(height: 8),
+            const Text(
+              'You can now test GPS location tracking',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+            ),
+            const Spacer(),
+            ElevatedButton(
+              onPressed: onTestGps,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF20C997),
+                minimumSize: const Size(double.infinity, 56),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              ),
+              child: const Text('Test GPS Tracking', style: TextStyle(fontSize: 18, color: Colors.white)),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: onGoToDeviceList,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(double.infinity, 56),
+                backgroundColor: const Color(0xFFF1F5F9),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              ),
+              child: const Text('Go to device list', style: TextStyle(fontSize: 18, color: Colors.grey)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -602,36 +615,38 @@ class NoDeviceFoundStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(),
-          CircleAvatar(
-            radius: 60,
-            backgroundColor: const Color(0xFFFFEBEE),
-            child: Image.asset('images/hotspot-red.png', width: 60),
-          ),
-          const SizedBox(height: 40),
-          const Text('No Device Found', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          const Text(
-            'Turn on your device and make sure it’s nearby, then try scanning again',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: Colors.black87),
-          ),
-          const Spacer(),
-          ElevatedButton(
-            onPressed: onTryAgain,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF20C997),
-              minimumSize: const Size(double.infinity, 56),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Spacer(),
+            CircleAvatar(
+              radius: 60,
+              backgroundColor: const Color(0xFFFFEBEE),
+              child: Image.asset('images/hotspot-red.png', width: 60),
             ),
-            child: const Text('Try Again', style: TextStyle(fontSize: 18, color: Colors.white)),
-          ),
-        ],
+            const SizedBox(height: 40),
+            const Text('No Device Found', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            const Text(
+              'Turn on your device and make sure it’s nearby, then try scanning again',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.black87),
+            ),
+            const Spacer(),
+            ElevatedButton(
+              onPressed: onTryAgain,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF20C997),
+                minimumSize: const Size(double.infinity, 56),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              ),
+              child: const Text('Try Again', style: TextStyle(fontSize: 18, color: Colors.white)),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -644,46 +659,48 @@ class ConnectionUnsuccessfulStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(24.0),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Spacer(),
-          CircleAvatar(
-            radius: 60,
-            backgroundColor: const Color(0xFFFFEBEE),
-            child: Image.asset('images/connection-red.png', width: 60),
-          ),
-          const SizedBox(height: 40),
-          const Text('Connection Unsuccessful', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 16),
-          const Text(
-            'Unable to connect to LoRa Gateway. Make sure your device is within range of a gateway and try again.',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 16, color: Colors.black87),
-          ),
-          const Spacer(),
-          ElevatedButton(
-            onPressed: onTryAgain,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF20C997),
-              minimumSize: const Size(double.infinity, 56),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Spacer(),
+            CircleAvatar(
+              radius: 60,
+              backgroundColor: const Color(0xFFFFEBEE),
+              child: Image.asset('images/connection-red.png', width: 60),
             ),
-            child: const Text('Try Again', style: TextStyle(fontSize: 18, color: Colors.white)),
-          ),
-          const SizedBox(height: 16),
-          TextButton(
-            onPressed: onViewMap,
-            style: TextButton.styleFrom(
-              minimumSize: const Size(double.infinity, 56),
-              side: const BorderSide(color: Color(0xFFCBD5E1)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+            const SizedBox(height: 40),
+            const Text('Connection Unsuccessful', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 16),
+            const Text(
+              'Unable to connect to LoRa Gateway. Make sure your device is within range of a gateway and try again.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.black87),
             ),
-            child: const Text('View Gateway Map', style: TextStyle(fontSize: 18, color: Colors.grey)),
-          ),
-        ],
+            const Spacer(),
+            ElevatedButton(
+              onPressed: onTryAgain,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF20C997),
+                minimumSize: const Size(double.infinity, 56),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              ),
+              child: const Text('Try Again', style: TextStyle(fontSize: 18, color: Colors.white)),
+            ),
+            const SizedBox(height: 16),
+            TextButton(
+              onPressed: onViewMap,
+              style: TextButton.styleFrom(
+                minimumSize: const Size(double.infinity, 56),
+                side: const BorderSide(color: Color(0xFFCBD5E1)),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+              ),
+              child: const Text('View Gateway Map', style: TextStyle(fontSize: 18, color: Colors.grey)),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:safechain/modals/success_modal.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:safechain/screens/login/login_screen.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -223,8 +224,8 @@ class _SignupScreenState extends State<SignupScreen> {
                                       fillColor: const Color(0xFFF1F5F9),
                                       filled: true,
                                       suffixIcon: IconButton(
-                                        icon: Image.asset(
-                                          _obscurePassword ? 'images/hide-password.png' : 'images/unhide-password.png',
+                                        icon: SvgPicture.asset(
+                                          _obscurePassword ? 'images/password-hidden.svg' : 'images/password-show.svg',
                                           width: 24,
                                         ),
                                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
@@ -266,8 +267,8 @@ class _SignupScreenState extends State<SignupScreen> {
                                       fillColor: const Color(0xFFF1F5F9),
                                       filled: true,
                                       suffixIcon: IconButton(
-                                        icon: Image.asset(
-                                          _obscureConfirmPassword ? 'images/hide-password.png' : 'images/unhide-password.png',
+                                        icon: SvgPicture.asset(
+                                          _obscureConfirmPassword ? 'images/password-hidden.svg' : 'images/password-show.svg',
                                           width: 24,
                                         ),
                                         onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),

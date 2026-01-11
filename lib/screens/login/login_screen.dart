@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:safechain/screens/home/home_screen.dart';
 import 'package:safechain/screens/signup/signup_screen.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import 'package:safechain/screens/forgot_password/forgot_password_screen.dart';
 import 'package:safechain/modals/error_modal.dart';
 
@@ -182,8 +183,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                       fillColor: const Color(0xFFF1F5F9),
                                       filled: true,
                                       suffixIcon: IconButton(
-                                        icon: Image.asset(
-                                          _obscurePassword ? 'images/hide-password.png' : 'images/unhide-password.png',
+                                        icon: SvgPicture.asset(
+                                          _obscurePassword ? 'images/password-hidden.svg' : 'images/password-show.svg',
                                           width: 24,
                                         ),
                                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
