@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:safechain/modals/success_modal.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:safechain/screens/login/login_screen.dart';
+import 'package:slider_captcha/slider_captcha.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -28,7 +28,7 @@ class _SignupScreenState extends State<SignupScreen> {
   double _passwordStrength = 0;
   final RegExp _upperRegExp = RegExp(r'[A-Z]');
   final RegExp _lowerRegExp = RegExp(r'[a-z]');
-  final RegExp _specialRegExp = RegExp(r'[!@#$%^&*(),.?":{}|<>]');
+  final RegExp _specialRegExp = RegExp(r'[!@#$%^&*(),.?":{}|<>_]');
   final RegExp _numberRegExp = RegExp(r'[0-9]');
 
   @override
@@ -60,11 +60,36 @@ class _SignupScreenState extends State<SignupScreen> {
     return Colors.green;
   }
 
+  void _initiateSignup() {
+    if (_formKey.currentState!.validate() && _agreedToTerms) {
+      showDialog(
+        context: context,
+        builder: (context) {
+          return SliderCaptcha(
+            image: Image.asset(
+              'images/logo.png',
+              fit: BoxFit.fitWidth,
+            ),
+            onConfirm: (value) async {
+              Navigator.of(context).pop();
+              if (value) {
+                await _handleSignup();
+              } else {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('CAPTCHA verification failed.')),
+                  );
+                }
+              }
+            },
+          );
+        },
+      );
+    }
+  }
+
   Future<void> _handleSignup() async {
-    if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
-
     try {
       UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
@@ -95,7 +120,7 @@ class _SignupScreenState extends State<SignupScreen> {
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
             MaterialPageRoute(builder: (context) => const LoginScreen()),
-            (route) => false,
+                (route) => false,
           );
         }
       }
@@ -106,9 +131,13 @@ class _SignupScreenState extends State<SignupScreen> {
       } else if (e.code == 'email-already-in-use') {
         message = 'An account already exists for that email.';
       }
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An unexpected error occurred: $e')));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An unexpected error occurred: $e')));
+      }
     }
 
     if (mounted) {
@@ -177,7 +206,6 @@ class _SignupScreenState extends State<SignupScreen> {
                                   const SizedBox(height: 8),
                                   TextFormField(
                                     controller: _fullNameController,
-                                    autovalidateMode: AutovalidateMode.onUserInteraction,
                                     decoration: InputDecoration(
                                       hintText: 'Enter your Full Name',
                                       fillColor: const Color(0xFFF1F5F9),
@@ -187,14 +215,18 @@ class _SignupScreenState extends State<SignupScreen> {
                                         borderSide: BorderSide.none,
                                       ),
                                     ),
-                                    validator: (value) => value!.isEmpty ? 'Enter your full name' : null,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Enter your full name';
+                                      }
+                                      return null;
+                                    },
                                   ),
                                   const SizedBox(height: 20),
                                   const Text('Email', style: TextStyle(fontWeight: FontWeight.bold)),
                                   const SizedBox(height: 8),
                                   TextFormField(
                                     controller: _emailController,
-                                    autovalidateMode: AutovalidateMode.onUserInteraction,
                                     decoration: InputDecoration(
                                       hintText: 'Enter your email',
                                       fillColor: const Color(0xFFF1F5F9),
@@ -204,7 +236,15 @@ class _SignupScreenState extends State<SignupScreen> {
                                         borderSide: BorderSide.none,
                                       ),
                                     ),
-                                    validator: (value) => (value == null || !value.contains('@')) ? 'Enter a valid email' : null,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Enter your email';
+                                      }
+                                      if (!value.contains('@')) {
+                                        return 'Enter a valid email';
+                                      }
+                                      return null;
+                                    },
                                   ),
                                   const SizedBox(height: 20),
                                   const Text('Password', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -212,14 +252,14 @@ class _SignupScreenState extends State<SignupScreen> {
                                   TextFormField(
                                     controller: _passwordController,
                                     obscureText: _obscurePassword,
-                                    autovalidateMode: AutovalidateMode.onUserInteraction,
                                     decoration: InputDecoration(
                                       hintText: 'Create a password',
                                       fillColor: const Color(0xFFF1F5F9),
                                       filled: true,
                                       suffixIcon: IconButton(
-                                        icon: SvgPicture.asset(
-                                          _obscurePassword ? 'images/password-hidden.svg' : 'images/password-show.svg',
+                                        icon: Icon(
+                                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                          color: Colors.grey,
                                         ),
                                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                                       ),
@@ -229,12 +269,24 @@ class _SignupScreenState extends State<SignupScreen> {
                                       ),
                                     ),
                                     validator: (value) {
-                                      if (value == null || value.isEmpty) return 'Enter a password';
-                                      if (value.length < 8) return 'Password must be at least 8 characters';
-                                      if (!_upperRegExp.hasMatch(value)) return 'Add at least 1 uppercase letter';
-                                      if (!_lowerRegExp.hasMatch(value)) return 'Add at least 1 lowercase letter';
-                                      if (!_numberRegExp.hasMatch(value)) return 'Add at least 1 number';
-                                      if (!_specialRegExp.hasMatch(value)) return 'Add at least 1 special character';
+                                      if (value == null || value.isEmpty) {
+                                        return 'Enter a password';
+                                      }
+                                      if (value.length < 8) {
+                                        return 'Password must be at least 8 characters';
+                                      }
+                                      if (!_upperRegExp.hasMatch(value)) {
+                                        return 'Add at least 1 uppercase letter';
+                                      }
+                                      if (!_lowerRegExp.hasMatch(value)) {
+                                        return 'Add at least 1 lowercase letter';
+                                      }
+                                      if (!_numberRegExp.hasMatch(value)) {
+                                        return 'Add at least 1 number';
+                                      }
+                                      if (!_specialRegExp.hasMatch(value)) {
+                                        return 'Add at least 1 special character';
+                                      }
                                       return null;
                                     },
                                   ),
@@ -254,14 +306,14 @@ class _SignupScreenState extends State<SignupScreen> {
                                   TextFormField(
                                     controller: _confirmPasswordController,
                                     obscureText: _obscureConfirmPassword,
-                                    autovalidateMode: AutovalidateMode.onUserInteraction,
                                     decoration: InputDecoration(
                                       hintText: 'Confirm your password',
                                       fillColor: const Color(0xFFF1F5F9),
                                       filled: true,
                                       suffixIcon: IconButton(
-                                        icon: SvgPicture.asset(
-                                          _obscureConfirmPassword ? 'images/password-hidden.svg' : 'images/password-show.svg',
+                                        icon: Icon(
+                                          _obscureConfirmPassword ? Icons.visibility_off : Icons.visibility,
+                                          color: Colors.grey,
                                         ),
                                         onPressed: () => setState(() => _obscureConfirmPassword = !_obscureConfirmPassword),
                                       ),
@@ -270,20 +322,32 @@ class _SignupScreenState extends State<SignupScreen> {
                                         borderSide: BorderSide.none,
                                       ),
                                     ),
-                                    validator: (value) => value != _passwordController.text ? 'Passwords do not match' : null,
+                                    validator: (value) {
+                                      if (value == null || value.isEmpty) {
+                                        return 'Confirm your password';
+                                      }
+                                      if (value != _passwordController.text) {
+                                        return 'Passwords do not match';
+                                      }
+                                      return null;
+                                    },
                                   ),
                                   const SizedBox(height: 20),
                                   Row(
                                     children: [
                                       Checkbox(
                                         value: _agreedToTerms,
-                                        onChanged: (value) => setState(() => _agreedToTerms = value!),
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _agreedToTerms = value ?? false;
+                                          });
+                                        },
                                         activeColor: const Color(0xFF20C997),
                                         checkColor: Colors.white,
                                         side: const BorderSide(color: Color(0xFF4B5563), width: 1.5),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                                       ),
-                                      const Expanded(
+                                      Expanded(
                                         child: Text.rich(
                                           TextSpan(
                                             text: 'I agree to Safechain\'s ',
@@ -305,7 +369,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                   ),
                                   const SizedBox(height: 32),
                                   ElevatedButton(
-                                    onPressed: _agreedToTerms && !_isLoading ? _handleSignup : null,
+                                    onPressed: _agreedToTerms && !_isLoading ? _initiateSignup : null,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: _agreedToTerms ? const Color(0xFF20C997) : Colors.grey,
                                       minimumSize: const Size(double.infinity, 56),

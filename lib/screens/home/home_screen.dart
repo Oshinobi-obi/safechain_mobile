@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:safechain/screens/add_device/add_device_flow.dart';
 import 'package:safechain/screens/guide/guide_screen.dart';
 import 'package:safechain/screens/profile/profile_screen.dart';
+import 'package:safechain/widgets/battery_indicator.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -45,6 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<Widget> widgetOptions = <Widget>[
       DevicesContent(userData: _userData),
       const GuideScreen(),
+      const Center(child: Text('Announcement Screen')), // Placeholder
       const ProfileScreen(),
     ];
 
@@ -72,7 +75,11 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Guide',
             ),
             BottomNavigationBarItem(
-              icon: Image.asset(_selectedIndex == 2 ? 'images/profile-active.png' : 'images/profile-inactive.png', width: 24, height: 24),
+              icon: SvgPicture.asset(_selectedIndex == 2 ? 'images/announcement-active.svg' : 'images/announcement-inactive.svg', width: 24, height: 24),
+              label: 'Announcement',
+            ),
+            BottomNavigationBarItem(
+              icon: Image.asset(_selectedIndex == 3 ? 'images/profile-active.png' : 'images/profile-inactive.png', width: 24, height: 24),
               label: 'Profile',
             ),
           ],
@@ -115,7 +122,7 @@ class DevicesContent extends StatelessWidget {
                   ),
                 ),
               ),
-              // Background Circles (Light Decorative Elements)
+              // Background Circles
               Positioned(
                 top: -50,
                 right: -50,
@@ -144,7 +151,7 @@ class DevicesContent extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(24, 60, 24, 32),
                 child: Column(
                   children: [
-                    // Top Row: Logo (left) and Bell (right)
+                    // Top Row: Logo and Bell
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -265,7 +272,7 @@ class DevicesContent extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 24),
             child: Column(
               children: [
-                _buildDeviceCard(context, 'Safechain001', 'SC-KC-001', '98%'),
+                _buildDeviceCard(context, 'Safechain001', 'SC-KC-001', 80),
               ],
             ),
           ),
@@ -274,7 +281,7 @@ class DevicesContent extends StatelessWidget {
     );
   }
 
-  Widget _buildDeviceCard(BuildContext context, String name, String id, String battery) {
+  Widget _buildDeviceCard(BuildContext context, String name, String id, int battery) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -301,13 +308,7 @@ class DevicesContent extends StatelessWidget {
                   ],
                 ),
               ),
-              Row(
-                children: [
-                  Text(battery, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
-                  const SizedBox(width: 6),
-                  Image.asset('images/battery-green.png', width: 28),
-                ],
-              ),
+              BatteryIndicator(charge: battery),
             ],
           ),
           const SizedBox(height: 20),
