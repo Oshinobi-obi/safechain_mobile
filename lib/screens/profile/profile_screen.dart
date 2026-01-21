@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:safechain/screens/login/login_screen.dart';
 import 'package:safechain/screens/profile/personal_information_screen.dart';
 import 'package:safechain/screens/profile/emergency_contacts_screen.dart';
@@ -18,12 +19,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   User? _user;
   Map<String, dynamic>? _userData;
   bool _isLoading = true;
-  bool _notificationsEnabled = true;
+  bool _notificationsEnabled = false;
   StreamSubscription<User?>? _authSubscription;
 
   @override
   void initState() {
     super.initState();
+    _checkNotificationPermission();
     _authSubscription = FirebaseAuth.instance.userChanges().listen((user) {
       setState(() {
         _user = user;
@@ -32,6 +34,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _fetchUserData(user);
       }
     });
+  }
+
+  Future<void> _checkNotificationPermission() async {
+    final status = await Permission.notification.status;
+    if (mounted) {
+      setState(() {
+        _notificationsEnabled = status.isGranted;
+      });
+    }
   }
 
   Future<void> _fetchUserData(User user) async {
@@ -43,6 +54,105 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _isLoading = false;
       });
     }
+  }
+
+  Future<void> _handleNotificationToggle(bool value) async {
+    if (value) {
+      // User wants to enable notifications
+      final status = await Permission.notification.request();
+
+      if (status.isGranted) {
+        setState(() {
+          _notificationsEnabled = true;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Notifications enabled successfully'),
+              backgroundColor: Color(0xFF20C997),
+            ),
+          );
+        }
+      } else if (status.isDenied) {
+        setState(() {
+          _notificationsEnabled = false;
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Notification permission denied'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } else if (status.isPermanentlyDenied) {
+        setState(() {
+          _notificationsEnabled = false;
+        });
+        // Show dialog to open settings
+        _showPermissionDialog();
+      }
+    } else {
+      // User wants to disable notifications
+      // Show dialog to inform user they need to disable from settings
+      _showDisableNotificationDialog();
+    }
+  }
+
+  void _showPermissionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Permission Required'),
+        content: const Text(
+          'Notification permission is permanently denied. Please enable it from app settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              openAppSettings();
+            },
+            child: const Text(
+              'Open Settings',
+              style: TextStyle(color: Color(0xFF20C997)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDisableNotificationDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Disable Notifications'),
+        content: const Text(
+          'To disable notifications, please go to your device settings and turn off notifications for SafeChain.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              openAppSettings();
+            },
+            child: const Text(
+              'Open Settings',
+              style: TextStyle(color: Color(0xFF20C997)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _confirmAndLogout() async {
@@ -69,7 +179,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
+              (route) => false,
         );
       }
     }
@@ -133,9 +243,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            
+
             const SizedBox(height: 24),
-            
+
             _buildSectionHeader('General'),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
@@ -273,7 +383,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
       trailing: Switch(
         value: _notificationsEnabled,
-        onChanged: (val) => setState(() => _notificationsEnabled = val),
+        onChanged: _handleNotificationToggle,
         activeColor: const Color(0xFF20C997),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),

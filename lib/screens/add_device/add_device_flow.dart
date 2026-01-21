@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:safechain/screens/home/home_screen.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class AddDeviceFlow extends StatefulWidget {
   const AddDeviceFlow({super.key});
@@ -14,6 +18,7 @@ class AddDeviceFlow extends StatefulWidget {
 class _AddDeviceFlowState extends State<AddDeviceFlow> {
   final PageController _pageController = PageController();
   int _currentStep = 0;
+  BluetoothDevice? _selectedDevice;
 
   void _nextStep() {
     _pageController.nextPage(
@@ -41,8 +46,19 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
         children: [
           EnableBluetoothStep(onEnable: _nextStep, onSkip: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomeScreen()))),
           PairYourDeviceStep(onStart: _nextStep, onBack: () => _goToStep(0)),
-          ScanningStep(onFound: _nextStep, onCancel: () => _goToStep(1), onNoDevice: () => _goToStep(8)),
-          SetUpDeviceStep(onAdd: _nextStep, onCancel: () => _goToStep(1)),
+          ScanningStep(
+            onDeviceSelected: (device) {
+              setState(() => _selectedDevice = device);
+              _nextStep();
+            },
+            onCancel: () => _goToStep(1),
+            onNoDevice: () => _goToStep(8),
+          ),
+          SetUpDeviceStep(
+            device: _selectedDevice,
+            onAdd: _nextStep,
+            onCancel: () => _goToStep(1)
+          ),
           TestingGatewayStep(onSuccess: _nextStep, onError: () => _goToStep(9)),
           AllSetStep(
             onTestGps: () => _goToStep(6),
@@ -58,10 +74,24 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
   }
 }
 
-class EnableBluetoothStep extends StatelessWidget {
+class EnableBluetoothStep extends StatefulWidget {
   final VoidCallback onEnable;
   final VoidCallback onSkip;
   const EnableBluetoothStep({super.key, required this.onEnable, required this.onSkip});
+
+  @override
+  State<EnableBluetoothStep> createState() => _EnableBluetoothStepState();
+}
+
+class _EnableBluetoothStepState extends State<EnableBluetoothStep> {
+  Future<void> _enableBluetooth() async {
+    if (await Permission.bluetooth.request().isGranted) {
+      if (Platform.isAndroid) {
+        await FlutterBluePlus.turnOn();
+      }
+    }
+    widget.onEnable();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -93,7 +123,7 @@ class EnableBluetoothStep extends StatelessWidget {
             ),
             const Spacer(),
             ElevatedButton(
-              onPressed: onEnable,
+              onPressed: _enableBluetooth,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF20C997),
                 minimumSize: const Size(double.infinity, 56),
@@ -103,7 +133,7 @@ class EnableBluetoothStep extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             TextButton(
-              onPressed: onSkip,
+              onPressed: widget.onSkip,
               style: TextButton.styleFrom(
                 minimumSize: const Size(double.infinity, 56),
                 backgroundColor: const Color(0xFFF1F5F9),
@@ -203,31 +233,38 @@ class PairYourDeviceStep extends StatelessWidget {
 }
 
 class ScanningStep extends StatefulWidget {
-  final VoidCallback onFound;
+  final Function(BluetoothDevice) onDeviceSelected;
   final VoidCallback onCancel;
   final VoidCallback onNoDevice;
-  const ScanningStep({super.key, required this.onFound, required this.onCancel, required this.onNoDevice});
+  const ScanningStep({super.key, required this.onDeviceSelected, required this.onCancel, required this.onNoDevice});
 
   @override
   State<ScanningStep> createState() => _ScanningStepState();
 }
 
-class _ScanningStepState extends State<ScanningStep> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
+class _ScanningStepState extends State<ScanningStep> {
+  late StreamSubscription<List<ScanResult>> _scanSubscription;
+  List<ScanResult> _scanResults = [];
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
-    // Simulate finding a device
-    Future.delayed(const Duration(seconds: 4), () {
-      if (mounted) setState(() {}); // Show device found
+    _startScan();
+  }
+
+  void _startScan() {
+    _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
+      setState(() {
+        _scanResults = results;
+      });
     });
+    FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
   }
 
   @override
   void dispose() {
-    _controller.dispose();
+    _scanSubscription.cancel();
+    FlutterBluePlus.stopScan();
     super.dispose();
   }
 
@@ -247,76 +284,55 @@ class _ScanningStepState extends State<ScanningStep> with SingleTickerProviderSt
         child: Center(
           child: Column(
             children: [
-              const SizedBox(height: 100), // Increased top spacing
-              AnimatedBuilder(
-                animation: _controller,
-                builder: (context, child) {
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      for (var i = 0; i < 3; i++)
-                        Transform.scale(
-                          scale: 1 + (_controller.value + i / 3) % 1 * 1.5,
-                          child: Container(
-                            width: 100,
-                            height: 100,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFF20C997).withOpacity(0.3 * (1 - (_controller.value + i / 3) % 1)),
-                            ),
-                          ),
-                        ),
-                      CircleAvatar(
-                        radius: 50,
-                        backgroundColor: const Color(0xFFE6F9F3),
-                        child: Image.asset('images/hotspot-icon.png', width: 50, color: const Color(0xFF20C997)),
-                      ),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 40),
+              const SizedBox(height: 100),
               const Text('Searching for devices', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               const Text('Please wait...', style: TextStyle(color: Colors.grey)),
               const SizedBox(height: 60),
-              // Simulated found device
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: InkWell(
-                  onTap: widget.onFound,
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
-                    ),
-                    child: Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(color: const Color(0xFFE6F9F3), borderRadius: BorderRadius.circular(12)),
-                          child: Image.asset('images/hotspot-icon.png', width: 24, color: const Color(0xFF20C997)),
-                        ),
-                        const SizedBox(width: 16),
-                        const Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+              Expanded(
+                child: ListView.builder(
+                  itemCount: _scanResults.length,
+                  itemBuilder: (context, index) {
+                    final result = _scanResults[index];
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                      child: InkWell(
+                        onTap: () => widget.onDeviceSelected(result.device),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(20),
+                            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
+                          ),
+                          child: Row(
                             children: [
-                              Text('Safechain Device', style: TextStyle(fontWeight: FontWeight.bold)),
-                              Text('ID: SC-KC-002', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(color: const Color(0xFFE6F9F3), borderRadius: BorderRadius.circular(12)),
+                                child: Image.asset('images/hotspot-icon.png', width: 24, color: const Color(0xFF20C997)),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(result.device.platformName.isNotEmpty ? result.device.platformName : 'N/A', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    Text('ID: ${result.device.remoteId}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(color: const Color(0xFFE6F9F3), borderRadius: BorderRadius.circular(20)),
+                                child: const Text('Found', style: TextStyle(color: Color(0xFF20C997), fontSize: 12, fontWeight: FontWeight.bold)),
+                              ),
                             ],
                           ),
                         ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(color: const Color(0xFFE6F9F3), borderRadius: BorderRadius.circular(20)),
-                          child: const Text('Found', style: TextStyle(color: Color(0xFF20C997), fontSize: 12, fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ],
@@ -328,9 +344,10 @@ class _ScanningStepState extends State<ScanningStep> with SingleTickerProviderSt
 }
 
 class SetUpDeviceStep extends StatelessWidget {
+  final BluetoothDevice? device;
   final VoidCallback onAdd;
   final VoidCallback onCancel;
-  const SetUpDeviceStep({super.key, required this.onAdd, required this.onCancel});
+  const SetUpDeviceStep({super.key, this.device, required this.onAdd, required this.onCancel});
 
   @override
   Widget build(BuildContext context) {
@@ -360,9 +377,9 @@ class SetUpDeviceStep extends StatelessWidget {
                   children: [
                     Image.asset('images/logo.png', height: 60),
                     const SizedBox(height: 24),
-                    const Text('Safechain Device Found', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    Text(device?.platformName.isNotEmpty ?? false ? device!.platformName : 'Safechain Device Found', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 8),
-                    const Text('ID: SC-KC-002', style: TextStyle(color: Colors.grey)),
+                    Text('ID: ${device?.remoteId ?? 'N/A'}', style: const TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
@@ -580,7 +597,7 @@ class _GpsTestingStepState extends State<GpsTestingStep> {
       ),
       body: FlutterMap(
         options: MapOptions(
-          initialCenter: _currentLocation != null 
+          initialCenter: _currentLocation != null
             ? LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!)
             : const LatLng(14.7120, 121.0387),
           initialZoom: 15.0,

@@ -10,6 +10,7 @@ class AnnouncementScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: const Color(0xFFF1F5F9),
         elevation: 0,
+        scrolledUnderElevation: 0.0,
         title: const Text(
           'Announcement',
           style: TextStyle(
@@ -52,10 +53,10 @@ class AnnouncementScreen extends StatelessWidget {
             context,
             name: 'Juan Dela Cruz',
             time: '10 hrs ago',
-            title: ''Ada' now a tropical storm; Signal No. 1 up in areas across the country',
+            title: "'Ada' now a tropical storm; Signal No. 1 up in areas across the country",
             content:
                 'MANILA, Philippines — Tropical Storm Ada (International name: Nokoen) strengthened Thursday afternoon, January 15, as it moved closer to the Philippines, prompting PAGASA to raise lowest-level wind signals over parts of Luzon, Visayas and Mindanao.',
-            image: 'images/announcement/typhoon.png',
+            image: 'images/typhoon.png',
           ),
         ],
       ),

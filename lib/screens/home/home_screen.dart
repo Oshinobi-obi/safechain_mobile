@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:safechain/screens/add_device/add_device_flow.dart';
+import 'package:safechain/screens/announcement/announcement_screen.dart';
 import 'package:safechain/screens/guide/guide_screen.dart';
 import 'package:safechain/screens/profile/profile_screen.dart';
 import 'package:safechain/widgets/battery_indicator.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -47,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
     final List<Widget> widgetOptions = <Widget>[
       DevicesContent(userData: _userData),
       const GuideScreen(),
-      const Center(child: Text('Announcement Screen')), // Placeholder
+      const AnnouncementScreen(),
       const ProfileScreen(),
     ];
 
@@ -75,7 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Guide',
             ),
             BottomNavigationBarItem(
-              icon: SvgPicture.asset(_selectedIndex == 2 ? 'images/announcement-active.svg' : 'images/announcement-inactive.svg', width: 24, height: 24),
+              icon: Image.asset(_selectedIndex == 2 ? 'images/announcement-active.png' : 'images/announcement-inactive.png', width: 24, height: 24),
               label: 'Announcement',
             ),
             BottomNavigationBarItem(
@@ -105,14 +105,13 @@ class DevicesContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final String fullName = userData?['full_name'] ?? 'User';
 
-    return SingleChildScrollView(
-      child: Column(
-        children: [
-          // Header Section
-          Stack(
+    return CustomScrollView(
+      slivers: [
+        SliverToBoxAdapter(
+          child: Stack(
             children: [
               Container(
-                height: 420, 
+                height: 420,
                 width: double.infinity,
                 decoration: const BoxDecoration(
                   color: Color(0xFF20C997),
@@ -219,7 +218,7 @@ class DevicesContent extends StatelessWidget {
                             border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
                           ),
                           child: const CircleAvatar(
-                            radius: 35, 
+                            radius: 35,
                             backgroundColor: Colors.white30,
                             backgroundImage: AssetImage('images/profile-picture.png'),
                           ),
@@ -266,18 +265,19 @@ class DevicesContent extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 24),
-          // Device List
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              children: [
-                _buildDeviceCard(context, 'Safechain001', 'SC-KC-001', 80),
-              ],
+        ),
+        SliverPadding(
+          padding: const EdgeInsets.all(24),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                return _buildDeviceCard(context, 'Safechain001', 'SC-KC-001', 80);
+              },
+              childCount: 1,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
