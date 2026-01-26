@@ -1,8 +1,8 @@
-
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'package:safechain/services/session_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:safechain/screens/home/home_screen.dart';
@@ -39,26 +39,47 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
     );
   }
 
-  Future<void> _addDeviceToFirestore() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _selectedDevice == null) return;
+  Future<void> _addDevice() async {
+    final user = await SessionManager.getUser();
+    if (user == null || _selectedDevice == null) {
+      if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You must be logged in to add a device.'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
+    const String apiUrl = 'https://safechain.site/api/mobile/add_device.php';
 
     try {
-      await FirebaseFirestore.instance
-          .collection('residents')
-          .doc(user.uid)
-          .collection('devices')
-          .add({
-        'name': _deviceName,
-        'id': _selectedDevice!.remoteId.toString(),
-        'battery': 100, // Default battery
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-      _nextStep();
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error adding device: $e'), backgroundColor: Colors.red),
+       final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode(<String, String>{
+          'resident_id': user.residentId,
+          'name': _deviceName,
+          'bt_remote_id': _selectedDevice!.remoteId.toString(),
+        }),
       );
+
+      if (response.statusCode == 201) {
+        _nextStep();
+      } else {
+        final responseBody = jsonDecode(response.body);
+        final message = responseBody['message'] ?? 'Failed to add device.';
+         if(mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+       if(mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error adding device: $e'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -83,7 +104,7 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
           ),
           SetUpDeviceStep(
             device: _selectedDevice,
-            onAdd: _addDeviceToFirestore,
+            onAdd: _addDevice,
             onCancel: () => _goToStep(1),
             onNameChanged: (name) => setState(() => _deviceName = name),
           ),

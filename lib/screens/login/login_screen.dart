@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/screens/home/home_screen.dart';
 import 'package:safechain/screens/signup/signup_screen.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:safechain/screens/forgot_password/forgot_password_screen.dart';
 import 'package:safechain/modals/error_modal.dart';
 
@@ -25,75 +26,94 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _checkRememberMe();
+    _checkLoginStatus();
   }
 
-  void _checkRememberMe() async {
-    final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString('email');
-    final password = prefs.getString('password');
-    if (email != null && password != null) {
-      _emailController.text = email;
-      _passwordController.text = password;
-      setState(() {
-        _rememberMe = true;
-      });
-      _handleLogin(fromAutoLogin: true);
-    }
-  }
-
-  Future<void> _handleLogin({bool fromAutoLogin = false}) async {
-    if (!fromAutoLogin) {
-      if (!_formKey.currentState!.validate()) return;
-    }
-
-    setState(() => _isLoading = true);
-
-    try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
-      );
-
-      final prefs = await SharedPreferences.getInstance();
-      if (_rememberMe) {
-        await prefs.setString('email', _emailController.text.trim());
-        await prefs.setString('password', _passwordController.text.trim());
-      } else {
-        await prefs.remove('email');
-        await prefs.remove('password');
-      }
-
+  // Check if user is already logged in
+  void _checkLoginStatus() async {
+    final isLoggedIn = await SessionManager.isLoggedIn();
+    if (isLoggedIn) {
       if (mounted) {
-        // Navigate to Home Screen after login
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
       }
-    } on FirebaseAuthException catch (e) {
-      if (!fromAutoLogin) {
-        String message = 'The email or password you entered is incorrect.';
-        if (mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => ErrorModal(title: 'Login Failed', message: message),
-          );
+      return; // Stop further execution
+    }
+    // If not logged in, check for a remembered email
+    _loadRememberedEmail();
+  }
+
+  void _loadRememberedEmail() async {
+    final prefs = await SharedPreferences.getInstance();
+    final email = prefs.getString('rememberedEmail');
+    if (email != null) {
+      _emailController.text = email;
+      setState(() {
+        _rememberMe = true;
+      });
+    }
+  }
+
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
+
+    setState(() => _isLoading = true);
+
+    const String apiUrl = 'https://safechain.site/api/mobile/login.php';
+
+    try {
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode(<String, String>{
+          'email': _emailController.text.trim(),
+          'password': _passwordController.text.trim(),
+        }),
+      );
+
+      final responseBody = jsonDecode(response.body);
+      final message = responseBody['message'] ?? 'An unknown error occurred.';
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200 && responseBody['status'] == 'success') {
+        // Login success, save user session
+        final user = UserModel.fromJson(responseBody['user']);
+        await SessionManager.saveUser(user);
+
+        // Handle "Remember Me"
+        final prefs = await SharedPreferences.getInstance();
+        if (_rememberMe) {
+          await prefs.setString('rememberedEmail', _emailController.text.trim());
+        } else {
+          await prefs.remove('rememberedEmail');
         }
+
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => const HomeScreen()),
+        );
+
+      } else {
+        showDialog(
+          context: context,
+          builder: (context) => ErrorModal(title: 'Login Failed', message: message),
+        );
       }
     } catch (e) {
-      if (!fromAutoLogin && mounted) {
+      if (mounted) {
         showDialog(
           context: context,
           builder: (context) => ErrorModal(
             title: 'An Unexpected Error Occurred',
-            message: e.toString(),
+            message: 'Could not connect to the server. Please check your internet connection.',
           ),
         );
       }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+    }
+
+    if (mounted) {
+      setState(() => _isLoading = false);
     }
   }
 
@@ -183,8 +203,9 @@ class _LoginScreenState extends State<LoginScreen> {
                                       fillColor: const Color(0xFFF1F5F9),
                                       filled: true,
                                       suffixIcon: IconButton(
-                                        icon: SvgPicture.asset(
-                                          _obscurePassword ? 'images/password-hidden.svg' : 'images/password-show.svg',
+                                        icon: Icon(
+                                          _obscurePassword ? Icons.visibility_off : Icons.visibility,
+                                          color: Colors.grey,
                                         ),
                                         onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
                                       ),
@@ -231,7 +252,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                   ),
                                   const SizedBox(height: 32),
                                   ElevatedButton(
-                                    onPressed: _isLoading ? null : () => _handleLogin(),
+                                    onPressed: _isLoading ? null : _handleLogin,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFF20C997),
                                       minimumSize: const Size(double.infinity, 56),

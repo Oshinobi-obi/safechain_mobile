@@ -1,11 +1,12 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:http/http.dart' as http;
+import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/widgets/phone_number_formatter.dart';
 
 class PersonalInformationScreen extends StatefulWidget {
-  final Map<String, dynamic> userData;
+  final UserModel userData;
   const PersonalInformationScreen({super.key, required this.userData});
 
   @override
@@ -27,13 +28,12 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.userData['full_name']);
-    _emailController = TextEditingController(text: widget.userData['email']);
-    _contactController = TextEditingController(text: widget.userData['contact_number']);
-    _addressController = TextEditingController(text: widget.userData['address']);
-    _selectedConditions = List<String>.from(widget.userData['medical_conditions'] ?? []);
-    
-    // Format initial contact number if it exists
+    _nameController = TextEditingController(text: widget.userData.name);
+    _emailController = TextEditingController(text: widget.userData.email);
+    _contactController = TextEditingController(text: widget.userData.contact);
+    _addressController = TextEditingController(text: widget.userData.address);
+    _selectedConditions = List<String>.from(widget.userData.medicalConditions);
+
     if (_contactController.text.isNotEmpty) {
       _contactController.text = PhoneNumberFormatter().formatEditUpdate(TextEditingValue.empty, _contactController.value).text;
     }
@@ -50,34 +50,46 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
 
   Future<void> _saveChanges() async {
     setState(() => _isLoading = true);
+    const String apiUrl = 'https://safechain.site/api/mobile/update_profile.php';
+
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await FirebaseFirestore.instance.collection('residents').doc(user.uid).update({
-          'full_name': _nameController.text.trim(),
-          'contact_number': _contactController.text.replaceAll('-', '').trim(),
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode({
+          'resident_id': widget.userData.residentId,
+          'name': _nameController.text.trim(),
           'address': _addressController.text.trim(),
+          'contact': _contactController.text.replaceAll('-', '').trim(),
           'medical_conditions': _selectedConditions,
-        });
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Profile updated successfully!')),
-          );
-          Navigator.pop(context);
+        }),
+      );
+
+      final responseBody = jsonDecode(response.body);
+      final message = responseBody['message'] ?? 'An error occurred.';
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200 && responseBody['status'] == 'success') {
+        if (responseBody.containsKey('user')) {
+          final updatedUser = UserModel.fromJson(responseBody['user']);
+          await SessionManager.saveUser(updatedUser);
         }
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.green));
+        Navigator.pop(context);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Failed to update profile: $e')),
-        );
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An unexpected error occurred: $e')));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  void _showMedicalConditions() {
+   void _showMedicalConditions() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -152,6 +164,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     );
   }
 
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -191,12 +204,12 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    widget.userData['full_name'] ?? 'User',
+                    widget.userData.name,
                     style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
-                  const Text(
-                    'User ID: USR-2025-001',
-                    style: TextStyle(color: Colors.grey, fontSize: 14),
+                  Text(
+                    'User ID: ${widget.userData.residentId}',
+                    style: const TextStyle(color: Colors.grey, fontSize: 14),
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(

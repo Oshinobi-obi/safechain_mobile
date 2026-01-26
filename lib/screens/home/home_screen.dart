@@ -1,11 +1,31 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/screens/add_device/add_device_flow.dart';
 import 'package:safechain/screens/announcement/announcement_screen.dart';
 import 'package:safechain/screens/guide/guide_screen.dart';
 import 'package:safechain/screens/profile/profile_screen.dart';
 import 'package:safechain/widgets/battery_indicator.dart';
+
+// Data model for a device
+class Device {
+  final int deviceId;
+  final String name;
+  final String btRemoteId;
+  final int battery;
+
+  Device({required this.deviceId, required this.name, required this.btRemoteId, required this.battery});
+
+  factory Device.fromJson(Map<String, dynamic> json) {
+    return Device(
+      deviceId: json['device_id'] is int ? json['device_id'] : int.tryParse(json['device_id'].toString()) ?? 0,
+      name: json['name'] ?? 'Unnamed Device',
+      btRemoteId: json['bt_remote_id'] ?? 'No ID',
+      battery: json['battery'] is int ? json['battery'] : int.tryParse(json['battery'].toString()) ?? 0,
+    );
+  }
+}
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,25 +36,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  Map<String, dynamic>? _userData;
-
-  @override
-  void initState() {
-    super.initState();
-    _fetchUserData();
-  }
-
-  Future<void> _fetchUserData() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user != null) {
-      final doc = await FirebaseFirestore.instance.collection('residents').doc(user.uid).get();
-      if (mounted) {
-        setState(() {
-          _userData = doc.data();
-        });
-      }
-    }
-  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -45,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> widgetOptions = <Widget>[
-      DevicesContent(userData: _userData),
+      const DevicesContent(), // Changed to const
       const GuideScreen(),
       const AnnouncementScreen(),
       const ProfileScreen(),
@@ -97,30 +98,59 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-class DevicesContent extends StatelessWidget {
-  final Map<String, dynamic>? userData;
-  const DevicesContent({super.key, this.userData});
+class DevicesContent extends StatefulWidget {
+  const DevicesContent({super.key});
+
+  @override
+  State<DevicesContent> createState() => _DevicesContentState();
+}
+
+class _DevicesContentState extends State<DevicesContent> {
+  Future<List<Device>>? _devicesFuture;
+  UserModel? _currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    // Load user data and then fetch devices
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final user = await SessionManager.getUser();
+    if (user != null) {
+      setState(() {
+        _currentUser = user;
+        _devicesFuture = _fetchDevices(user.residentId);
+      });
+    }
+  }
+
+  Future<List<Device>> _fetchDevices(String residentId) async {
+    final uri = Uri.parse('https://safechain.site/api/mobile/get_devices.php?resident_id=$residentId');
+    final response = await http.get(uri);
+
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      if (body['status'] == 'success') {
+        final List<dynamic> deviceList = body['devices'];
+        return deviceList.map((json) => Device.fromJson(json)).toList();
+      }
+    }
+    // If the API call fails or status is not success, throw an exception.
+    throw Exception('Failed to load devices');
+  }
 
   @override
   Widget build(BuildContext context) {
-    final String fullName = userData?['full_name'] ?? 'User';
-    final uid = FirebaseAuth.instance.currentUser?.uid;
+    final String fullName = _currentUser?.name ?? 'User';
 
-    if (uid == null) {
-      return const Center(child: Text("Not logged in."));
-    }
-
-    return StreamBuilder<QuerySnapshot>(
-        stream: FirebaseFirestore.instance.collection('residents').doc(uid).collection('devices').snapshots(),
+    return FutureBuilder<List<Device>>(
+        future: _devicesFuture,
         builder: (context, snapshot) {
-
-          List<QueryDocumentSnapshot> devices = [];
+          List<Device> devices = [];
           if (snapshot.hasData) {
-            devices = snapshot.data!.docs;
-          }
-
-          if (snapshot.hasError) {
-            print("Firestore Error: ${snapshot.error}");
+            devices = snapshot.data!;
           }
 
           return CustomScrollView(
@@ -139,36 +169,12 @@ class DevicesContent extends StatelessWidget {
                         ),
                       ),
                     ),
-                    // Background Circles
-                    Positioned(
-                      top: -50,
-                      right: -50,
-                      child: Container(
-                        width: 250,
-                        height: 250,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 20,
-                      left: -60,
-                      child: Container(
-                        width: 200,
-                        height: 200,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.1),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                    ),
+                    Positioned(top: -50, right: -50, child: Container(width: 250, height: 250, decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle))),
+                    Positioned(bottom: 20, left: -60, child: Container(width: 200, height: 200, decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle))),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(24, 60, 24, 32),
                       child: Column(
                         children: [
-                          // Top Row: Logo and Bell
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
@@ -190,27 +196,18 @@ class DevicesContent extends StatelessWidget {
                                 children: [
                                   Container(
                                     padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(15),
-                                    ),
+                                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(15)),
                                     child: Image.asset('images/Bell.png', height: 24, color: Colors.white),
                                   ),
                                   Positioned(
-                                    right: -4,
-                                    top: -4,
-                                    child: Container(
-                                      padding: const EdgeInsets.all(4),
-                                      decoration: const BoxDecoration(color: Color(0xFFF87171), shape: BoxShape.circle),
-                                      child: const Text('3', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                    ),
+                                    right: -4, top: -4,
+                                    child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Color(0xFFF87171), shape: BoxShape.circle), child: const Text('3', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
                                   ),
                                 ],
                               ),
                             ],
                           ),
                           const SizedBox(height: 30),
-                          // Middle Row: Welcome text aligned with Profile icon
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             crossAxisAlignment: CrossAxisAlignment.center,
@@ -220,38 +217,22 @@ class DevicesContent extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     const Text('Welcome back,', style: TextStyle(color: Colors.white70, fontSize: 18)),
-                                    Text(
-                                      fullName,
-                                      style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
+                                    Text(fullName, style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
                                   ],
                                 ),
                               ),
                               const SizedBox(width: 12),
                               Container(
                                 padding: const EdgeInsets.all(2),
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white.withOpacity(0.3), width: 2),
-                                ),
-                                child: const CircleAvatar(
-                                  radius: 35,
-                                  backgroundColor: Colors.white30,
-                                  backgroundImage: AssetImage('images/profile-picture.png'),
-                                ),
+                                decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.3), width: 2)),
+                                child: const CircleAvatar(radius: 35, backgroundColor: Colors.white30, backgroundImage: AssetImage('images/profile-picture.png')),
                               ),
                             ],
                           ),
                           const SizedBox(height: 40),
-                          // Bottom: Summary Card
                           Container(
                             padding: const EdgeInsets.all(20),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(25),
-                              border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
-                            ),
+                            decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(25), border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5)),
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
@@ -268,12 +249,7 @@ class DevicesContent extends StatelessWidget {
                                   },
                                   icon: const Icon(Icons.add, color: Color(0xFF20C997), size: 20),
                                   label: const Text('Add Device', style: TextStyle(color: Color(0xFF20C997), fontWeight: FontWeight.bold)),
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.white,
-                                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                                    elevation: 0,
-                                  ),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.white, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)), elevation: 0),
                                 ),
                               ],
                             ),
@@ -284,42 +260,28 @@ class DevicesContent extends StatelessWidget {
                   ],
                 ),
               ),
-
               if (snapshot.connectionState == ConnectionState.waiting)
-                const SliverToBoxAdapter(
-                    child: Padding(
-                        padding: EdgeInsets.all(32.0),
-                        child: Center(child: CircularProgressIndicator(color: Color(0xFF20C997))))
-                ),
+                const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(32.0), child: Center(child: CircularProgressIndicator(color: Color(0xFF20C997))))),
+              
+              if (snapshot.hasError)
+                 SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(32.0), child: Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.red))))),
 
-              if (devices.isEmpty && snapshot.connectionState != ConnectionState.waiting)
+              if (devices.isEmpty && snapshot.connectionState != ConnectionState.waiting && !snapshot.hasError)
                 const SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(24, 48, 24, 24),
-                    child: Center(
-                        child: Text(
-                            "Connect your first SafeChain device now!",
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey, fontSize: 18)
-                        )
-                    ),
+                    child: Center(child: Text("Connect your first SafeChain device now!", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontSize: 18))),
                   ),
                 ),
 
-              if(devices.isNotEmpty)
+              if (devices.isNotEmpty)
                 SliverPadding(
                   padding: const EdgeInsets.all(24),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
-                          (context, index) {
-                        final deviceData = devices[index].data() as Map<String, dynamic>;
-                        final name = deviceData['name'] ?? 'Unnamed Device';
-                        final id = deviceData['id'] ?? 'No ID';
-                        final battery = deviceData['battery'] ?? 0;
-                        return Padding(
-                            padding: const EdgeInsets.only(bottom: 16.0),
-                            child: _buildDeviceCard(context, name, id, battery)
-                        );
+                      (context, index) {
+                        final device = devices[index];
+                        return Padding(padding: const EdgeInsets.only(bottom: 16.0), child: _buildDeviceCard(context, device));
                       },
                       childCount: devices.length,
                     ),
@@ -327,11 +289,10 @@ class DevicesContent extends StatelessWidget {
                 ),
             ],
           );
-        }
-    );
+        });
   }
 
-  Widget _buildDeviceCard(BuildContext context, String name, String id, int battery) {
+  Widget _buildDeviceCard(BuildContext context, Device device) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -353,12 +314,12 @@ class DevicesContent extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                    Text('ID: $id', style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                    Text(device.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                    Text('ID: ${device.btRemoteId}', style: const TextStyle(color: Colors.grey, fontSize: 14)),
                   ],
                 ),
               ),
-              BatteryIndicator(charge: battery),
+              BatteryIndicator(charge: device.battery),
             ],
           ),
           const SizedBox(height: 20),
@@ -369,12 +330,7 @@ class DevicesContent extends StatelessWidget {
                   onPressed: () {},
                   icon: Image.asset('images/gps-icon.png', width: 20, color: Colors.white),
                   label: const Text('Test GPS', style: TextStyle(color: Colors.white, fontSize: 16)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF20C997),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    elevation: 0,
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF20C997), padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
                 ),
               ),
               const SizedBox(width: 12),
@@ -383,11 +339,7 @@ class DevicesContent extends StatelessWidget {
                   onPressed: () {},
                   icon: Image.asset('images/gear-icon.png', width: 20, color: Colors.grey),
                   label: const Text('Settings', style: TextStyle(color: Colors.grey, fontSize: 16)),
-                  style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    side: BorderSide(color: Colors.grey.shade200, width: 1.5),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
+                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), side: BorderSide(color: Colors.grey.shade200, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
                 ),
               ),
             ],

@@ -1,6 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
 import 'package:safechain/modals/success_modal.dart';
 import 'package:safechain/screens/login/login_screen.dart';
 import 'package:slider_captcha/slider_captcha.dart';
@@ -28,7 +28,7 @@ class _SignupScreenState extends State<SignupScreen> {
   double _passwordStrength = 0;
   final RegExp _upperRegExp = RegExp(r'[A-Z]');
   final RegExp _lowerRegExp = RegExp(r'[a-z]');
-  final RegExp _specialRegExp = RegExp(r'[!@#$%^&*(),.?":{}|<>_]');
+  final RegExp _specialRegExp = RegExp(r'[!@#$%^&*(),.?\":{}|<>_]');
   final RegExp _numberRegExp = RegExp(r'[0-9]');
 
   @override
@@ -90,30 +90,34 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _handleSignup() async {
     setState(() => _isLoading = true);
+
+    const String apiUrl = 'https://safechain.site/api/mobile/register.php';
+
     try {
-      UserCredential userCredential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: _emailController.text.trim(),
-        password: _passwordController.text.trim(),
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        // Sending data as form fields instead of JSON
+        body: {
+          'name': _fullNameController.text.trim(),
+          'email': _emailController.text.trim(),
+          'password': _passwordController.text.trim(),
+        },
       );
 
-      if (userCredential.user != null) {
-        await FirebaseFirestore.instance.collection('residents').doc(userCredential.user!.uid).set({
-          'full_name': _fullNameController.text.trim(),
-          'email': _emailController.text.trim(),
-          'registered_date': Timestamp.now(),
-          'profile_picture_url': null,
-        });
+      final responseBody = jsonDecode(response.body);
+      final message = responseBody['message'] ?? 'An unknown error occurred.';
 
-        if (mounted) {
-          showDialog(
-            context: context,
-            barrierDismissible: false,
-            builder: (context) => const SuccessModal(
-              title: 'Account Registration Success!',
-              message: 'Redirecting to Login Page...',
-            ),
-          );
-        }
+      if (!mounted) return;
+
+      if (response.statusCode == 201) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const SuccessModal(
+            title: 'Account Registration Success!',
+            message: 'Redirecting to Login Page...',
+          ),
+        );
 
         await Future.delayed(const Duration(seconds: 3));
 
@@ -123,20 +127,16 @@ class _SignupScreenState extends State<SignupScreen> {
                 (route) => false,
           );
         }
-      }
-    } on FirebaseAuthException catch (e) {
-      String message = 'An error occurred.';
-      if (e.code == 'weak-password') {
-        message = 'The password provided is too weak.';
-      } else if (e.code == 'email-already-in-use') {
-        message = 'An account already exists for that email.';
-      }
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(message)),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An unexpected error occurred: $e')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('An unexpected error occurred: $e')),
+        );
       }
     }
 
@@ -155,7 +155,7 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF20C997),
@@ -206,6 +206,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                   const SizedBox(height: 8),
                                   TextFormField(
                                     controller: _fullNameController,
+                                    autovalidateMode: AutovalidateMode.onUserInteraction,
                                     decoration: InputDecoration(
                                       hintText: 'Enter your Full Name',
                                       fillColor: const Color(0xFFF1F5F9),
@@ -227,6 +228,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                   const SizedBox(height: 8),
                                   TextFormField(
                                     controller: _emailController,
+                                    autovalidateMode: AutovalidateMode.onUserInteraction,
                                     decoration: InputDecoration(
                                       hintText: 'Enter your email',
                                       fillColor: const Color(0xFFF1F5F9),
@@ -252,6 +254,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                   TextFormField(
                                     controller: _passwordController,
                                     obscureText: _obscurePassword,
+                                    autovalidateMode: AutovalidateMode.onUserInteraction,
                                     decoration: InputDecoration(
                                       hintText: 'Create a password',
                                       fillColor: const Color(0xFFF1F5F9),
@@ -306,6 +309,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                   TextFormField(
                                     controller: _confirmPasswordController,
                                     obscureText: _obscureConfirmPassword,
+                                    autovalidateMode: AutovalidateMode.onUserInteraction,
                                     decoration: InputDecoration(
                                       hintText: 'Confirm your password',
                                       fillColor: const Color(0xFFF1F5F9),
