@@ -1,12 +1,15 @@
+
 import 'dart:async';
 import 'dart:io';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:safechain/screens/home/home_screen.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:location/location.dart';
-import 'package:permission_handler/permission_handler.dart';
+import 'package:location/location.dart' as loc;
+import 'package:permission_handler/permission_handler.dart' as perm;
 
 class AddDeviceFlow extends StatefulWidget {
   const AddDeviceFlow({super.key});
@@ -19,6 +22,7 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
   final PageController _pageController = PageController();
   int _currentStep = 0;
   BluetoothDevice? _selectedDevice;
+  String _deviceName = 'Safechain001';
 
   void _nextStep() {
     _pageController.nextPage(
@@ -33,6 +37,29 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
     );
+  }
+
+  Future<void> _addDeviceToFirestore() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || _selectedDevice == null) return;
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('residents')
+          .doc(user.uid)
+          .collection('devices')
+          .add({
+        'name': _deviceName,
+        'id': _selectedDevice!.remoteId.toString(),
+        'battery': 100, // Default battery
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      _nextStep();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error adding device: $e'), backgroundColor: Colors.red),
+      );
+    }
   }
 
   @override
@@ -52,20 +79,20 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
               _nextStep();
             },
             onCancel: () => _goToStep(1),
-            onNoDevice: () => _goToStep(8),
+            onNoDevice: () => _goToStep(7),
           ),
           SetUpDeviceStep(
             device: _selectedDevice,
-            onAdd: _nextStep,
-            onCancel: () => _goToStep(1)
+            onAdd: _addDeviceToFirestore,
+            onCancel: () => _goToStep(1),
+            onNameChanged: (name) => setState(() => _deviceName = name),
           ),
-          TestingGatewayStep(onSuccess: _nextStep, onError: () => _goToStep(9)),
+          TestingGatewayStep(onSuccess: _nextStep, onError: () => _goToStep(8)),
           AllSetStep(
             onTestGps: () => _goToStep(6),
             onGoToDeviceList: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomeScreen())),
           ),
           GpsTestingStep(onBack: () => _goToStep(5)),
-          // Error Steps
           NoDeviceFoundStep(onTryAgain: () => _goToStep(2)),
           ConnectionUnsuccessfulStep(onTryAgain: () => _goToStep(4), onViewMap: () {}),
         ],
@@ -84,13 +111,106 @@ class EnableBluetoothStep extends StatefulWidget {
 }
 
 class _EnableBluetoothStepState extends State<EnableBluetoothStep> {
+  bool _isRequesting = false;
+
   Future<void> _enableBluetooth() async {
-    if (await Permission.bluetooth.request().isGranted) {
+    setState(() => _isRequesting = true);
+
+    try {
       if (Platform.isAndroid) {
-        await FlutterBluePlus.turnOn();
+        Map<perm.Permission, perm.PermissionStatus> statuses = await [
+          perm.Permission.bluetoothScan,
+          perm.Permission.bluetoothConnect,
+          perm.Permission.bluetoothAdvertise,
+          perm.Permission.location,
+        ].request();
+
+        bool allGranted =
+        statuses.values.every((status) => status.isGranted == true);
+
+        if (!allGranted) {
+          bool anyPermanentlyDenied = statuses.values.any((status) => status.isPermanentlyDenied);
+
+          if (anyPermanentlyDenied) {
+            _showPermissionDialog();
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Bluetooth permissions are required to continue'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          setState(() => _isRequesting = false);
+          return;
+        }
+
+        try {
+          await FlutterBluePlus.turnOn();
+        } catch (e) {
+          if(mounted)
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please turn on Bluetooth manually from settings'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } else if (Platform.isIOS) {
+        await perm.Permission.bluetooth.request();
       }
+
+      final isOn = await FlutterBluePlus.isOn;
+      if (isOn) {
+        widget.onEnable();
+      } else {
+        if(mounted)
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please turn on Bluetooth to continue'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if(mounted)
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
-    widget.onEnable();
+
+    setState(() => _isRequesting = false);
+  }
+
+  void _showPermissionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Permissions Required'),
+        content: const Text(
+          'Bluetooth and Location permissions are required to scan for devices. Please enable them in app settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              perm.openAppSettings();
+            },
+            child: const Text(
+              'Open Settings',
+              style: TextStyle(color: Color(0xFF20C997)),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -123,13 +243,22 @@ class _EnableBluetoothStepState extends State<EnableBluetoothStep> {
             ),
             const Spacer(),
             ElevatedButton(
-              onPressed: _enableBluetooth,
+              onPressed: _isRequesting ? null : _enableBluetooth,
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFF20C997),
                 minimumSize: const Size(double.infinity, 56),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
               ),
-              child: const Text('Enable', style: TextStyle(fontSize: 18, color: Colors.white)),
+              child: _isRequesting
+                  ? const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              )
+                  : const Text('Enable', style: TextStyle(fontSize: 18, color: Colors.white)),
             ),
             const SizedBox(height: 16),
             TextButton(
@@ -245,6 +374,7 @@ class ScanningStep extends StatefulWidget {
 class _ScanningStepState extends State<ScanningStep> {
   late StreamSubscription<List<ScanResult>> _scanSubscription;
   List<ScanResult> _scanResults = [];
+  bool _isScanning = false;
 
   @override
   void initState() {
@@ -252,13 +382,33 @@ class _ScanningStepState extends State<ScanningStep> {
     _startScan();
   }
 
-  void _startScan() {
+  Future<void> _startScan() async {
+    setState(() => _isScanning = true);
+
     _scanSubscription = FlutterBluePlus.scanResults.listen((results) {
-      setState(() {
-        _scanResults = results;
-      });
+      if (mounted) {
+        setState(() {
+          _scanResults = results.where((r) => r.device.platformName.isNotEmpty).toList();
+        });
+      }
     });
-    FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+
+    try {
+      await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
+      await Future.delayed(const Duration(seconds: 11));
+
+      if (mounted && _scanResults.isEmpty) {
+        setState(() => _isScanning = false);
+        widget.onNoDevice();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Scan error: $e'), backgroundColor: Colors.red),
+        );
+        setState(() => _isScanning = false);
+      }
+    }
   }
 
   @override
@@ -284,10 +434,19 @@ class _ScanningStepState extends State<ScanningStep> {
         child: Center(
           child: Column(
             children: [
-              const SizedBox(height: 100),
-              const Text('Searching for devices', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 60),
+              if (_isScanning && _scanResults.isEmpty)
+                const ScanningPulse(),
+              const SizedBox(height: 40),
+              const Text(
+                'Searching for devices',
+                style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 8),
-              const Text('Please wait...', style: TextStyle(color: Colors.grey)),
+              Text(
+                _scanResults.isEmpty ? 'Please wait...' : '${_scanResults.length} device(s) found',
+                style: const TextStyle(color: Colors.grey),
+              ),
               const SizedBox(height: 60),
               Expanded(
                 child: ListView.builder(
@@ -317,7 +476,7 @@ class _ScanningStepState extends State<ScanningStep> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(result.device.platformName.isNotEmpty ? result.device.platformName : 'N/A', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                    Text(result.device.platformName, style: const TextStyle(fontWeight: FontWeight.bold)),
                                     Text('ID: ${result.device.remoteId}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
                                   ],
                                 ),
@@ -347,7 +506,8 @@ class SetUpDeviceStep extends StatelessWidget {
   final BluetoothDevice? device;
   final VoidCallback onAdd;
   final VoidCallback onCancel;
-  const SetUpDeviceStep({super.key, this.device, required this.onAdd, required this.onCancel});
+  final Function(String) onNameChanged;
+  const SetUpDeviceStep({super.key, this.device, required this.onAdd, required this.onCancel, required this.onNameChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -386,7 +546,9 @@ class SetUpDeviceStep extends StatelessWidget {
               const SizedBox(height: 40),
               const Text('Device Name', style: TextStyle(fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              TextField(
+              TextFormField(
+                initialValue: 'Safechain001',
+                onChanged: onNameChanged,
                 decoration: InputDecoration(
                   hintText: 'Safechain001',
                   fillColor: const Color(0xFFF1F5F9),
@@ -446,7 +608,6 @@ class _TestingGatewayStepState extends State<TestingGatewayStep> with SingleTick
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat();
-    // Simulate gateway test
     Future.delayed(const Duration(seconds: 3), widget.onSuccess);
   }
 
@@ -521,7 +682,7 @@ class AllSetStep extends StatelessWidget {
               child: Image.asset('images/hotspot-icon.png', width: 60, color: const Color(0xFF20C997)),
             ),
             const SizedBox(height: 40),
-            const Text('You’re All Set!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+            const Text('Your Device is Ready!', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             const Text(
               'Your device is connected and ready',
@@ -570,7 +731,7 @@ class GpsTestingStep extends StatefulWidget {
 }
 
 class _GpsTestingStepState extends State<GpsTestingStep> {
-  LocationData? _currentLocation;
+  loc.LocationData? _currentLocation;
 
   @override
   void initState() {
@@ -579,7 +740,20 @@ class _GpsTestingStepState extends State<GpsTestingStep> {
   }
 
   Future<void> _requestLocation() async {
-    final location = Location();
+    final location = loc.Location();
+
+    bool serviceEnabled = await location.serviceEnabled();
+    if (!serviceEnabled) {
+      serviceEnabled = await location.requestService();
+      if (!serviceEnabled) return;
+    }
+
+    loc.PermissionStatus permissionGranted = await location.hasPermission();
+    if (permissionGranted == loc.PermissionStatus.denied) {
+      permissionGranted = await location.requestPermission();
+      if (permissionGranted != loc.PermissionStatus.granted) return;
+    }
+
     _currentLocation = await location.getLocation();
     if (mounted) setState(() {});
   }
@@ -598,8 +772,8 @@ class _GpsTestingStepState extends State<GpsTestingStep> {
       body: FlutterMap(
         options: MapOptions(
           initialCenter: _currentLocation != null
-            ? LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!)
-            : const LatLng(14.7120, 121.0387),
+              ? LatLng(_currentLocation!.latitude!, _currentLocation!.longitude!)
+              : const LatLng(14.7120, 121.0387),
           initialZoom: 15.0,
         ),
         children: [
@@ -648,7 +822,7 @@ class NoDeviceFoundStep extends StatelessWidget {
             const Text('No Device Found', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             const Text(
-              'Turn on your device and make sure it’s nearby, then try scanning again',
+              'Turn on your device and make sure its nearby, then try scanning again',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 16, color: Colors.black87),
             ),
@@ -719,6 +893,86 @@ class ConnectionUnsuccessfulStep extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class ScanningPulse extends StatefulWidget {
+  const ScanningPulse({super.key});
+
+  @override
+  State<ScanningPulse> createState() => _ScanningPulseState();
+}
+
+class _ScanningPulseState extends State<ScanningPulse>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 2),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 180,
+      height: 180,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          _pulseCircle(1.0),
+          _pulseCircle(1.4),
+          _pulseCircle(1.8),
+
+          // CENTER ICON
+          Container(
+            width: 64,
+            height: 64,
+            decoration: const BoxDecoration(
+              color: Color(0xFF20C997),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Image.asset(
+                'images/hotspot-icon.png',
+                width: 28,
+                color: Colors.white,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _pulseCircle(double scale) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (_, __) {
+        return Transform.scale(
+          scale: scale * _controller.value,
+          child: Container(
+            width: 120,
+            height: 120,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF20C997)
+                  .withOpacity(1 - _controller.value),
+            ),
+          ),
+        );
+      },
     );
   }
 }
