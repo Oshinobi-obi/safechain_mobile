@@ -25,6 +25,8 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _obscureConfirmPassword = true;
   bool _agreedToTerms = false;
 
+  String? _emailErrorText;
+
   double _passwordStrength = 0;
   final RegExp _upperRegExp = RegExp(r'[A-Z]');
   final RegExp _lowerRegExp = RegExp(r'[a-z]');
@@ -61,6 +63,11 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   void _initiateSignup() {
+    // Clear previous server-side error before validating
+    setState(() {
+      _emailErrorText = null;
+    });
+
     if (_formKey.currentState!.validate() && _agreedToTerms) {
       showDialog(
         context: context,
@@ -96,7 +103,6 @@ class _SignupScreenState extends State<SignupScreen> {
     try {
       final response = await http.post(
         Uri.parse(apiUrl),
-        // Sending data as form fields instead of JSON
         body: {
           'name': _fullNameController.text.trim(),
           'email': _emailController.text.trim(),
@@ -127,7 +133,13 @@ class _SignupScreenState extends State<SignupScreen> {
                 (route) => false,
           );
         }
+      } else if (response.statusCode == 409) {
+        // Handle specific error for email already in use
+        setState(() {
+          _emailErrorText = message;
+        });
       } else {
+        // Handle all other errors with a SnackBar
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message)),
         );
@@ -229,6 +241,13 @@ class _SignupScreenState extends State<SignupScreen> {
                                   TextFormField(
                                     controller: _emailController,
                                     autovalidateMode: AutovalidateMode.onUserInteraction,
+                                    onChanged: (_) {
+                                      if (_emailErrorText != null) {
+                                        setState(() {
+                                          _emailErrorText = null;
+                                        });
+                                      }
+                                    },
                                     decoration: InputDecoration(
                                       hintText: 'Enter your email',
                                       fillColor: const Color(0xFFF1F5F9),
@@ -237,6 +256,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                         borderRadius: BorderRadius.circular(30),
                                         borderSide: BorderSide.none,
                                       ),
+                                      errorText: _emailErrorText,
                                     ),
                                     validator: (value) {
                                       if (value == null || value.isEmpty) {
