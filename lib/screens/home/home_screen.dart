@@ -8,7 +8,6 @@ import 'package:safechain/screens/guide/guide_screen.dart';
 import 'package:safechain/screens/profile/profile_screen.dart';
 import 'package:safechain/widgets/battery_indicator.dart';
 
-// Data model for a device
 class Device {
   final int deviceId;
   final String name;

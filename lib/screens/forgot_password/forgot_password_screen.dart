@@ -62,11 +62,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       final message = responseBody['message'] ?? 'An error occurred.';
 
       if (!mounted) return;
-
-      // Show the success message from the API, regardless of whether the email existed
       await showDialog(
         context: context,
-        barrierDismissible: false, // User must tap button to close
+        barrierDismissible: false,
         builder: (context) => SuccessModal(
           title: 'Request Sent',
           message: message,
@@ -74,7 +72,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       );
 
       if (mounted) {
-        Navigator.of(context).pop(); // Go back to the login screen
+        Navigator.of(context).pop();
       }
 
     } catch (e) {

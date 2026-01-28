@@ -186,7 +186,6 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
         padding: const EdgeInsets.fromLTRB(24, 16, 24, 24),
         child: Column(
           children: [
-            // Profile Section
             Center(
               child: Column(
                 children: [
@@ -227,8 +226,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
               ),
             ),
             const SizedBox(height: 40),
-            
-            // Form Fields
+
             _buildInputField('Full Name', _nameController),
             const SizedBox(height: 24),
             _buildInputField('Email', _emailController, enabled: false),

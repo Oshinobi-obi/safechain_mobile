@@ -10,14 +10,14 @@ class SuccessModal extends StatelessWidget {
   Widget build(BuildContext context) {
     return Dialog(
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20.0), // Rounded corners
+        borderRadius: BorderRadius.circular(20.0),
       ),
       child: Container(
-        padding: const EdgeInsets.fromLTRB(24, 32, 24, 24), // Adjusted padding
+        padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.check_circle, color: Color(0xFF20C997), size: 60), // Themed color and larger size
+            const Icon(Icons.check_circle, color: Color(0xFF20C997), size: 60),
             const SizedBox(height: 24),
             Text(
               title,

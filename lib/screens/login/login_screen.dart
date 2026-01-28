@@ -29,7 +29,6 @@ class _LoginScreenState extends State<LoginScreen> {
     _checkLoginStatus();
   }
 
-  // Check if user is already logged in
   void _checkLoginStatus() async {
     final isLoggedIn = await SessionManager.isLoggedIn();
     if (isLoggedIn) {
@@ -38,9 +37,8 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (context) => const HomeScreen()),
         );
       }
-      return; // Stop further execution
+      return;
     }
-    // If not logged in, check for a remembered email
     _loadRememberedEmail();
   }
 

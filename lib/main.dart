@@ -1,11 +1,10 @@
 import 'dart:async';
+import 'dart:io' show Platform;
+import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:safechain/screens/forgot_password/reset_password_screen.dart';
 import 'package:safechain/screens/startup/startup_screen.dart';
-import 'package:uni_links/uni_links.dart';
 
-// A global navigator key is needed to navigate from the deep link handler
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() {
@@ -21,48 +20,34 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  StreamSubscription? _sub;
+  late AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
 
   @override
   void initState() {
     super.initState();
-    // Handle deep links when the app is already running
-    _handleIncomingLinks();
-    // Handle the initial deep link when the app is launched from a cold state
-    _handleInitialLink();
+    _initDeepLinks();
   }
 
-  /// Handles incoming links while the app is running in the background.
-  void _handleIncomingLinks() {
-    _sub = uriLinkStream.listen((Uri? uri) {
-      if (!mounted) return;
-      _processLink(uri);
-    }, onError: (err) {
-      // You can add error logging here
-    });
-  }
+  Future<void> _initDeepLinks() async {
+    if (Platform.isAndroid || Platform.isIOS) {
+      _appLinks = AppLinks();
+      _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+        if (!mounted) return;
+        _processLink(uri);
+      });
 
-  /// Handles the link that the app was launched with.
-  Future<void> _handleInitialLink() async {
-    try {
-      final initialUri = await getInitialUri();
-      if (!mounted) return;
-      _processLink(initialUri);
-    } on PlatformException {
-      // Handle error
-    } on FormatException {
-      // Handle error
+      final initialUri = await _appLinks.getInitialAppLink();
+      if (initialUri != null) {
+        if (!mounted) return;
+        _processLink(initialUri);
+      }
     }
   }
 
-  /// Parses the URI and navigates to the ResetPasswordScreen if it's a valid reset link.
-  void _processLink(Uri? uri) {
-    if (uri == null) return;
-
-    // Check if the link is a password reset link
+  void _processLink(Uri uri) {
     if (uri.path == '/reset-password-page' && uri.queryParameters.containsKey('token')) {
       final token = uri.queryParameters['token']!;
-      // Use the navigatorKey to push the new screen
       navigatorKey.currentState?.push(
         MaterialPageRoute(
           builder: (context) => ResetPasswordScreen(token: token),
@@ -73,14 +58,14 @@ class _MyAppState extends State<MyApp> {
 
   @override
   void dispose() {
-    _sub?.cancel();
+    _linkSubscription?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey, // Assign the navigator key
+      navigatorKey: navigatorKey,
       title: 'SafeChain',
       theme: ThemeData(
         primarySwatch: Colors.green,

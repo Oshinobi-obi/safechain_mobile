@@ -160,10 +160,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(builder: (context) => PersonalInformationScreen(userData: user)),
-                    ).then((_) => _loadUserData()); // Refresh data when returning
+                    ).then((_) => _loadUserData());
                   }),
                   _buildMenuItem('Emergency Contacts', 'images/phone-red.png', () {
-                     // You might want to pass the user object here too
                     Navigator.push(context, MaterialPageRoute(builder: (context) => const EmergencyContactsScreen()));
                   }),
                   _buildMenuItem('Change Password', 'images/lock-yellow.png', () {}),

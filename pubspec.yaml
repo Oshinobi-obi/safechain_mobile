@@ -12,26 +12,14 @@ dependencies:
 
   cupertino_icons: ^1.0.8
   flutter_svg: ^2.0.10+1
-
-  # HTTP for backend communication
   http: ^1.2.1
-
-  # Maps & Location
   flutter_map: ^8.2.2
   location: ^8.0.1
   latlong2: ^0.9.1
-
-  # Media & Storage
   image_picker: ^1.1.2
   shared_preferences: ^2.3.2
-
-  # Captcha
   slider_captcha: ^1.0.1
-
-  # Deep Linking
-  uni_links: ^0.5.1
-
-  # Bluetooth
+  app_links: ^3.4.1
   flutter_blue_plus: ^1.31.20
   permission_handler: ^11.3.1
 
