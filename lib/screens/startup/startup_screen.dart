@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:safechain/screens/login/login_screen.dart';
+import 'package:safechain/services/session_manager.dart';
+import 'package:safechain/screens/home/home_screen.dart';
 import 'package:safechain/screens/welcome/welcome_screen.dart';
 
 class StartupScreen extends StatefulWidget {
@@ -33,16 +33,16 @@ class _StartupScreenState extends State<StartupScreen> with SingleTickerProvider
   }
 
   Future<void> _navigateToNext() async {
-    final prefs = await SharedPreferences.getInstance();
-    final email = prefs.getString('email');
-    final password = prefs.getString('password');
+    // Check the user's login status using the session manager
+    final bool isLoggedIn = await SessionManager.isLoggedIn();
 
+    // Wait for the animation to complete
     Timer(const Duration(seconds: 3), () {
       if (mounted) {
-        if (email != null && password != null) {
-          // If Remember Me is enabled, go to Login for auto-login
+        if (isLoggedIn) {
+          // If logged in, go directly to the Home Screen
           Navigator.of(context).pushReplacement(
-            MaterialPageRoute(builder: (context) => const LoginScreen()),
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
           );
         } else {
           // Otherwise, show the Welcome Screen

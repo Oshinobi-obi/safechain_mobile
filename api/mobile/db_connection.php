@@ -1,5 +1,4 @@
 <?php
-// db_connection.php
 
 $servername = "localhost";
 $username = "u131483420_safechain";

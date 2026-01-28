@@ -1,9 +1,7 @@
 <?php
-// api/mobile/forgot_password.php
 
 include 'db_connection.php';
 
-// This path assumes you run 'composer require phpmailer/phpmailer' in your public_html directory.
 require '../../vendor/autoload.php';
 
 use PHPMailer\PHPMailer\PHPMailer;
@@ -17,8 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     exit;
 }
 
-$data = json_decode(file_get_contents('php://input'), true);
-$email = $data['email'] ?? null;
+$email = $_POST['email'] ?? null;
 
 if (!$email) {
     http_response_code(400);
@@ -27,7 +24,6 @@ if (!$email) {
 }
 
 try {
-    // Check if the user exists
     $stmt = $conn->prepare("SELECT resident_id FROM residents WHERE email = ? AND is_archived = 0");
     $stmt->bind_param("s", $email);
     $stmt->execute();
@@ -40,10 +36,7 @@ try {
     }
     $stmt->close();
 
-    // Generate a secure, URL-safe token
     $token = bin2hex(random_bytes(32));
-
-    // Store the token in the password_resets table
     $delete_stmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
     $delete_stmt->bind_param("s", $email);
     $delete_stmt->execute();
@@ -54,22 +47,17 @@ try {
     $insert_stmt->execute();
     $insert_stmt->close();
 
-    // --- Email Sending Logic using GMAIL SMTP ---
     $mail = new PHPMailer(true);
     try {
         $mail->isSMTP();
-        $mail->Host       = 'intertas.mico.dichoso@gmail.com';
+        $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
         $mail->Username   = 'intertas.mico.dichoso@gmail.com';
         $mail->Password   = 'wrkx cvqd xiqb gdtw';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
-
-        // Recipients
         $mail->setFrom('intertas.mico.dichoso@gmail.com', 'SafeChain Support');
-        $mail->addAddress($email); // The user's email
-
-        // Content
+        $mail->addAddress($email);
         $reset_link = "https://safechain.site/reset-password-page?token=" . $token;
         $mail->isHTML(true);
         $mail->Subject = 'Password Reset Request for SafeChain';
@@ -79,8 +67,7 @@ try {
         $mail->send();
 
     } catch (Exception $e) {
-        // You should log this error on your server for debugging.
-        // error_log("Mailer Error: " . $mail->ErrorInfo);
+        error_log("PHPMailer Error: " . $mail->ErrorInfo);
     }
     
     http_response_code(200);

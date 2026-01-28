@@ -1,5 +1,4 @@
 <?php
-// api/mobile/reset_password.php
 
 include 'db_connection.php';
 
@@ -23,8 +22,6 @@ if (!$token || !$new_password) {
 }
 
 try {
-    // Validate the token and get the associated email
-    // We also check if the token is less than 1 hour old.
     $stmt = $conn->prepare("SELECT email FROM password_resets WHERE token = ? AND created_at >= NOW() - INTERVAL 1 HOUR");
     $stmt->bind_param("s", $token);
     $stmt->execute();
@@ -42,14 +39,12 @@ try {
     $email = $row['email'];
     $stmt->close();
 
-    // --- Update Password ---
     $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
 
     $update_stmt = $conn->prepare("UPDATE residents SET password = ? WHERE email = ?");
     $update_stmt->bind_param("ss", $hashed_password, $email);
     
     if ($update_stmt->execute()) {
-        // Password updated successfully. Now, delete the reset token.
         $delete_stmt = $conn->prepare("DELETE FROM password_resets WHERE email = ?");
         $delete_stmt->bind_param("s", $email);
         $delete_stmt->execute();

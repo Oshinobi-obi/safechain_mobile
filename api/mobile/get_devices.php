@@ -1,13 +1,11 @@
 <?php
-// api/mobile/get_devices.php
 
 include 'db_connection.php';
 
 header('Content-Type: application/json');
 
-// Expect resident_id to be passed as a GET parameter
 if (!isset($_GET['resident_id'])) {
-    http_response_code(400); // Bad Request
+    http_response_code(400);
     echo json_encode(['status' => 'error', 'message' => 'resident_id is required.']);
     exit;
 }
@@ -25,7 +23,7 @@ try {
         $devices[] = $row;
     }
 
-    http_response_code(200); // OK
+    http_response_code(200);
     echo json_encode(['status' => 'success', 'devices' => $devices]);
 
     $stmt->close();
