@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:safechain/modals/success_modal.dart';
 import 'package:safechain/screens/login/login_screen.dart';
+import 'package:safechain/widgets/fade_page_route.dart';
 import 'package:slider_captcha/slider_captcha.dart';
 
 class SignupScreen extends StatefulWidget {
@@ -129,7 +130,7 @@ class _SignupScreenState extends State<SignupScreen> {
 
         if (mounted) {
           Navigator.of(context).pushAndRemoveUntil(
-            MaterialPageRoute(builder: (context) => const LoginScreen()),
+            FadePageRoute(child: const LoginScreen()),
                 (route) => false,
           );
         }
@@ -412,7 +413,7 @@ class _SignupScreenState extends State<SignupScreen> {
                                       GestureDetector(
                                         onTap: () => Navigator.pushReplacement(
                                           context,
-                                          MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                          FadePageRoute(child: const LoginScreen()),
                                         ),
                                         child: const Text(
                                           'Sign In',

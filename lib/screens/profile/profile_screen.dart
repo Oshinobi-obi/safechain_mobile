@@ -4,6 +4,8 @@ import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/screens/login/login_screen.dart';
 import 'package:safechain/screens/profile/personal_information_screen.dart';
 import 'package:safechain/screens/profile/emergency_contacts_screen.dart';
+import 'package:safechain/widgets/fade_page_route.dart';
+import 'package:fluttermoji/fluttermoji.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -104,7 +106,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await SessionManager.logout();
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
+          FadePageRoute(child: const LoginScreen()),
           (route) => false,
         );
       }
@@ -136,7 +138,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Container(
                     padding: const EdgeInsets.all(4),
                     decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3)),
-                    child: const CircleAvatar(radius: 50, backgroundColor: Colors.white30, backgroundImage: AssetImage('images/profile-picture.png')),
+                    child: CircleAvatar(
+                      radius: 50,
+                      backgroundColor: Colors.white30,
+                      child: user.avatar != null
+                          ? FluttermojiCircleAvatar(radius: 50)
+                          : user.profilePictureUrl != null
+                              ? ClipOval(
+                                  child: Image.network(
+                                    user.profilePictureUrl!,
+                                    fit: BoxFit.cover,
+                                    width: 100,
+                                    height: 100,
+                                  ),
+                                )
+                              : const Icon(Icons.person, size: 50, color: Colors.white),
+                    ),
                   ),
                   const SizedBox(height: 16),
                   Text(user.name, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
@@ -159,11 +176,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildMenuItem('Personal Information', 'images/user-blue.png', () {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => PersonalInformationScreen(userData: user)),
+                      FadePageRoute(child: PersonalInformationScreen(userData: user)),
                     ).then((_) => _loadUserData());
                   }),
                   _buildMenuItem('Emergency Contacts', 'images/phone-red.png', () {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const EmergencyContactsScreen()));
+                    Navigator.push(context, FadePageRoute(child: const EmergencyContactsScreen()));
                   }),
                   _buildMenuItem('Change Password', 'images/lock-yellow.png', () {}),
                   _buildMenuItem('Privacy Policy', 'images/document-green.png', () {}),

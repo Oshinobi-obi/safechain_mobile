@@ -1,16 +1,21 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/widgets/phone_number_formatter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:fluttermoji/fluttermoji.dart';
 
 class PersonalInformationScreen extends StatefulWidget {
   final UserModel userData;
   const PersonalInformationScreen({super.key, required this.userData});
 
   @override
-  State<PersonalInformationScreen> createState() => _PersonalInformationScreenState();
+  State<PersonalInformationScreen> createState() =>
+      _PersonalInformationScreenState();
 }
 
 class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
@@ -20,9 +25,18 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   late TextEditingController _addressController;
   List<String> _selectedConditions = [];
   bool _isLoading = false;
+  File? _image;
+  String? _avatar;
 
   final List<String> _medicalConditions = [
-    'Asthma', 'Heart Disease', 'Visually Impaired', 'Pregnant', 'Elderly', 'Speech Impaired', 'None', 'Others'
+    'Asthma',
+    'Heart Disease',
+    'Visually Impaired',
+    'Pregnant',
+    'Elderly',
+    'Speech Impaired',
+    'None',
+    'Others'
   ];
 
   @override
@@ -33,9 +47,12 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     _contactController = TextEditingController(text: widget.userData.contact);
     _addressController = TextEditingController(text: widget.userData.address);
     _selectedConditions = List<String>.from(widget.userData.medicalConditions);
+    _avatar = widget.userData.avatar;
 
     if (_contactController.text.isNotEmpty) {
-      _contactController.text = PhoneNumberFormatter().formatEditUpdate(TextEditingValue.empty, _contactController.value).text;
+      _contactController.text = PhoneNumberFormatter()
+          .formatEditUpdate(TextEditingValue.empty, _contactController.value)
+          .text;
     }
   }
 
@@ -52,27 +69,31 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     setState(() => _isLoading = true);
     const String apiUrl = 'https://safechain.site/api/mobile/update_profile.php';
 
-    try {
-      final response = await http.post(
-        Uri.parse(apiUrl),
-        headers: {'Content-Type': 'application/json; charset=UTF-8'},
-        body: jsonEncode({
-          'resident_id': widget.userData.residentId,
-          'name': _nameController.text.trim(),
-          'address': _addressController.text.trim(),
-          'contact': _contactController.text.replaceAll('-', '').trim(),
-          'medical_conditions': _selectedConditions,
-        }),
-      );
+    var request = http.MultipartRequest('POST', Uri.parse(apiUrl));
+    request.fields['resident_id'] = widget.userData.residentId;
+    request.fields['name'] = _nameController.text.trim();
+    request.fields['email'] = _emailController.text.trim();
+    request.fields['address'] = _addressController.text.trim();
+    request.fields['contact'] = _contactController.text.replaceAll('-', '').trim();
+    request.fields['medical_conditions'] = jsonEncode(_selectedConditions);
 
-      final responseBody = jsonDecode(response.body);
-      final message = responseBody['message'] ?? 'An error occurred.';
+    if (_image != null) {
+      request.files.add(await http.MultipartFile.fromPath('profile_picture', _image!.path));
+    } else if (_avatar != null) {
+      request.fields['avatar'] = _avatar!;
+    }
+
+    try {
+      final response = await request.send();
+      final responseBody = await response.stream.bytesToString();
+      final decodedBody = jsonDecode(responseBody);
+      final message = decodedBody['message'] ?? 'An error occurred.';
 
       if (!mounted) return;
 
-      if (response.statusCode == 200 && responseBody['status'] == 'success') {
-        if (responseBody.containsKey('user')) {
-          final updatedUser = UserModel.fromJson(responseBody['user']);
+      if (response.statusCode == 200 && decodedBody['status'] == 'success') {
+        if (decodedBody.containsKey('user')) {
+          final updatedUser = UserModel.fromJson(decodedBody['user']);
           await SessionManager.saveUser(updatedUser);
         }
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.green));
@@ -89,7 +110,8 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     }
   }
 
-   void _showMedicalConditions() {
+
+  void _showMedicalConditions() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -148,7 +170,8 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                               },
                               activeColor: const Color(0xFF20C997),
                               controlAffinity: ListTileControlAffinity.leading,
-                              checkboxShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                              checkboxShape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(4)),
                             );
                           },
                         ),
@@ -164,6 +187,103 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     );
   }
 
+  void _showPictureOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+      ),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(Icons.photo_library, color: Color(0xFF20C997)),
+                title: const Text('Choose from Gallery'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImage(ImageSource.gallery);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.face, color: Color(0xFF20C997)),
+                title: const Text('Use Avatar'),
+                onTap: () {
+                  Navigator.pop(context);
+                  _showAvatarPicker();
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _pickImage(ImageSource source) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: source);
+    if (pickedFile != null) {
+      setState(() {
+        _image = File(pickedFile.path);
+        _avatar = null;
+      });
+    }
+  }
+
+
+  void _showAvatarPicker() async {
+    final fluttermojiController = FluttermojiFunctions();
+    String backupSvg = await fluttermojiController.encodeMySVGtoString();
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Customize Avatar'),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: SingleChildScrollView(
+              child: FluttermojiCustomizer(
+                autosave: true,
+                theme: FluttermojiThemeData(
+                  primaryBgColor: Colors.white,
+                  secondaryBgColor: const Color(0xFFF1F5F9),
+                  labelTextStyle: const TextStyle(fontWeight: FontWeight.bold),
+                  boxDecoration: const BoxDecoration(
+                    boxShadow: [BoxShadow(blurRadius: 0)],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString('fluttermoji', backupSvg);
+                Navigator.pop(context);
+              },
+              child: const Text('Cancel', style: TextStyle(color: Colors.red)),
+            ),
+            TextButton(
+              onPressed: () async {
+                final svg = await fluttermojiController.encodeMySVGtoString();
+                setState(() {
+                  _avatar = svg;
+                  _image = null;
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Save', style: TextStyle(color: Color(0xFF20C997))),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -195,10 +315,27 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                       shape: BoxShape.circle,
                       border: Border.all(color: const Color(0xFF20C997), width: 3),
                     ),
-                    child: const CircleAvatar(
-                      radius: 55,
-                      backgroundColor: Color(0xFFE6F9F3),
-                      backgroundImage: AssetImage('images/profile-active.png'),
+                    child: CircleAvatar(
+                        radius: 55,
+                        backgroundColor: const Color(0xFFE6F9F3),
+                        backgroundImage: _image != null ? FileImage(_image!) : null,
+                        child: _image == null && _avatar != null
+                          ? FluttermojiCircleAvatar(
+                            radius: 55,
+                            backgroundColor: Colors.grey[200],
+                          )
+                          : _image == null && widget.userData.profilePictureUrl != null && widget.userData.profilePictureUrl!.isNotEmpty
+                              ? ClipOval(
+                                child: Image.network(
+                                  widget.userData.profilePictureUrl!,
+                                  fit: BoxFit.cover,
+                                  width: 110,
+                                  height: 110,
+                                ),
+                              )
+                              : _image == null && (_avatar == null || _avatar!.isEmpty) && (widget.userData.profilePictureUrl == null || widget.userData.profilePictureUrl!.isEmpty)
+                                ? const Icon(Icons.person, size: 50, color: Colors.grey)
+                                : null,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -212,7 +349,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
-                    onPressed: () {},
+                    onPressed: _showPictureOptions,
                     icon: Image.asset('images/edit-icon.png', width: 20, color: Colors.white),
                     label: const Text('Edit Picture', style: TextStyle(color: Colors.white)),
                     style: ElevatedButton.styleFrom(
@@ -226,17 +363,16 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
               ),
             ),
             const SizedBox(height: 40),
-
             _buildInputField('Full Name', _nameController),
             const SizedBox(height: 24),
-            _buildInputField('Email', _emailController, enabled: false),
+            _buildInputField('Email', _emailController),
             const SizedBox(height: 24),
             _buildContactField(),
             const SizedBox(height: 24),
             _buildInputField('Address', _addressController),
             const SizedBox(height: 24),
-            _buildDropdownField('Specific Medical Condition', _selectedConditions.join(', '), _showMedicalConditions),
-            
+            _buildDropdownField(
+                'Specific Medical Condition', _selectedConditions.join(', '), _showMedicalConditions),
             const SizedBox(height: 20),
           ],
         ),
@@ -252,20 +388,25 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               elevation: 0,
             ),
-            child: _isLoading 
-              ? const SizedBox(
-                  height: 24,
-                  width: 24,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                )
-              : const Text('Save Changes', style: TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+            child: _isLoading
+                ? const SizedBox(
+                    height: 24,
+                    width: 24,
+                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                  )
+                : const Text('Save Changes',
+                    style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold)),
           ),
         ),
       ),
     );
   }
 
-  Widget _buildInputField(String label, TextEditingController controller, {bool enabled = true}) {
+  Widget _buildInputField(String label, TextEditingController controller,
+      {bool enabled = true}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -361,7 +502,10 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Expanded(child: Text(value.isNotEmpty ? value : 'Select your condition', style: const TextStyle(fontSize: 16), overflow: TextOverflow.ellipsis)),
+                Expanded(
+                    child: Text(value.isNotEmpty ? value : 'Select your condition',
+                        style: const TextStyle(fontSize: 16),
+                        overflow: TextOverflow.ellipsis)),
                 const Icon(Icons.arrow_drop_down, color: Colors.grey),
               ],
             ),

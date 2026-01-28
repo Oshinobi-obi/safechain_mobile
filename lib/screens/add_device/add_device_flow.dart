@@ -10,6 +10,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:location/location.dart' as loc;
 import 'package:permission_handler/permission_handler.dart' as perm;
+import 'package:safechain/widgets/fade_page_route.dart';
 
 class AddDeviceFlow extends StatefulWidget {
   const AddDeviceFlow({super.key});
@@ -92,7 +93,7 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
         physics: const NeverScrollableScrollPhysics(),
         onPageChanged: (index) => setState(() => _currentStep = index),
         children: [
-          EnableBluetoothStep(onEnable: _nextStep, onSkip: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomeScreen()))),
+          EnableBluetoothStep(onEnable: _nextStep, onSkip: () => Navigator.pushReplacement(context, FadePageRoute(child: const HomeScreen()))),
           PairYourDeviceStep(onStart: _nextStep, onBack: () => _goToStep(0)),
           ScanningStep(
             onDeviceSelected: (device) {
@@ -111,7 +112,7 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
           TestingGatewayStep(onSuccess: _nextStep, onError: () => _goToStep(8)),
           AllSetStep(
             onTestGps: () => _goToStep(6),
-            onGoToDeviceList: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const HomeScreen())),
+            onGoToDeviceList: () => Navigator.pushReplacement(context, FadePageRoute(child: const HomeScreen())),
           ),
           GpsTestingStep(onBack: () => _goToStep(5)),
           NoDeviceFoundStep(onTryAgain: () => _goToStep(2)),

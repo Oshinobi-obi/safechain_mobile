@@ -7,6 +7,8 @@ import 'package:safechain/screens/announcement/announcement_screen.dart';
 import 'package:safechain/screens/guide/guide_screen.dart';
 import 'package:safechain/screens/profile/profile_screen.dart';
 import 'package:safechain/widgets/battery_indicator.dart';
+import 'package:safechain/widgets/fade_page_route.dart';
+import 'package:fluttermoji/fluttermoji.dart';
 
 class Device {
   final int deviceId;
@@ -45,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> widgetOptions = <Widget>[
-      const DevicesContent(), // Changed to const
+      const DevicesContent(),
       const GuideScreen(),
       const AnnouncementScreen(),
       const ProfileScreen(),
@@ -53,7 +55,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: widgetOptions.elementAt(_selectedIndex),
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 300),
+        child: widgetOptions.elementAt(_selectedIndex),
+      ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -111,7 +116,6 @@ class _DevicesContentState extends State<DevicesContent> {
   @override
   void initState() {
     super.initState();
-    // Load user data and then fetch devices
     _loadData();
   }
 
@@ -136,7 +140,6 @@ class _DevicesContentState extends State<DevicesContent> {
         return deviceList.map((json) => Device.fromJson(json)).toList();
       }
     }
-    // If the API call fails or status is not success, throw an exception.
     throw Exception('Failed to load devices');
   }
 
@@ -221,10 +224,18 @@ class _DevicesContentState extends State<DevicesContent> {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                              Container(
+                               Container(
                                 padding: const EdgeInsets.all(2),
                                 decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.3), width: 2)),
-                                child: const CircleAvatar(radius: 35, backgroundColor: Colors.white30, backgroundImage: AssetImage('images/profile-picture.png')),
+                                child: CircleAvatar(
+                                  radius: 35,
+                                  backgroundColor: Colors.white30,
+                                  child: _currentUser?.avatar != null
+                                    ? FluttermojiCircleAvatar(radius: 35,)
+                                    : _currentUser?.profilePictureUrl != null
+                                      ? ClipOval(child: Image.network(_currentUser!.profilePictureUrl!, fit: BoxFit.cover, width: 70, height: 70,))
+                                      : const Icon(Icons.person, size: 35, color: Colors.white),
+                                ),
                               ),
                             ],
                           ),
@@ -244,7 +255,7 @@ class _DevicesContentState extends State<DevicesContent> {
                                 ),
                                 ElevatedButton.icon(
                                   onPressed: () {
-                                    Navigator.push(context, MaterialPageRoute(builder: (context) => const AddDeviceFlow()));
+                                    Navigator.push(context, FadePageRoute(child: const AddDeviceFlow()));
                                   },
                                   icon: const Icon(Icons.add, color: Color(0xFF20C997), size: 20),
                                   label: const Text('Add Device', style: TextStyle(color: Color(0xFF20C997), fontWeight: FontWeight.bold)),

@@ -7,6 +7,7 @@ import 'package:safechain/screens/home/home_screen.dart';
 import 'package:safechain/screens/signup/signup_screen.dart';
 import 'package:safechain/screens/forgot_password/forgot_password_screen.dart';
 import 'package:safechain/modals/error_modal.dart';
+import 'package:safechain/widgets/fade_page_route.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -34,7 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
     if (isLoggedIn) {
       if (mounted) {
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          FadePageRoute(child: const HomeScreen()),
         );
       }
       return;
@@ -89,7 +90,7 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
+          FadePageRoute(child: const HomeScreen()),
         );
 
       } else {
@@ -238,7 +239,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                         onPressed: () {
                                           Navigator.push(
                                             context,
-                                            MaterialPageRoute(builder: (context) => const ForgotPasswordScreen()),
+                                            FadePageRoute(child: const ForgotPasswordScreen()),
                                           );
                                         },
                                         child: const Text(
@@ -269,7 +270,7 @@ class _LoginScreenState extends State<LoginScreen> {
                                       GestureDetector(
                                         onTap: () => Navigator.push(
                                           context,
-                                          MaterialPageRoute(builder: (context) => const SignupScreen()),
+                                          FadePageRoute(child: const SignupScreen()),
                                         ),
                                         child: const Text(
                                           'Sign Up',
