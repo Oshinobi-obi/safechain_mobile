@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:safechain/screens/profile/change_password_screen.dart';
 import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/screens/login/login_screen.dart';
 import 'package:safechain/screens/profile/personal_information_screen.dart';
@@ -182,7 +183,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildMenuItem('Emergency Contacts', 'images/phone-red.png', () {
                     Navigator.push(context, FadePageRoute(child: const EmergencyContactsScreen()));
                   }),
-                  _buildMenuItem('Change Password', 'images/lock-yellow.png', () {}),
+                  _buildMenuItem('Change Password', 'images/lock-yellow.png', () {
+                     Navigator.push(context, FadePageRoute(child: const ChangePasswordScreen()));
+                  }),
                   _buildMenuItem('Privacy Policy', 'images/document-green.png', () {}),
                   _buildMenuItem('Terms of Use', 'images/document-orange.png', () {}),
                   _buildSwitchItem('Notifications', 'images/bell-purple.png'),

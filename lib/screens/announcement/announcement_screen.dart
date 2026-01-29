@@ -1,7 +1,29 @@
 import 'package:flutter/material.dart';
+import 'package:safechain/services/notification_service.dart';
 
-class AnnouncementScreen extends StatelessWidget {
+class AnnouncementScreen extends StatefulWidget {
   const AnnouncementScreen({super.key});
+
+  @override
+  State<AnnouncementScreen> createState() => _AnnouncementScreenState();
+}
+
+class _AnnouncementScreenState extends State<AnnouncementScreen> {
+  @override
+  void initState() {
+    super.initState();
+    _fetchAnnouncements();
+  }
+
+  Future<void> _fetchAnnouncements() async {
+    // This is a placeholder. In a real app, you would fetch announcements from your server.
+    // For now, we'll just add a notification to simulate a new announcement.
+    await NotificationService.addNotification(
+      'New Community Announcement',
+      'There is a new community announcement available.',
+      NotificationType.announcement,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {

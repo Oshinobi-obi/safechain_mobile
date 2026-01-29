@@ -188,39 +188,51 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   }
 
   void _showPictureOptions() {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+  showDialog(
+    context: context,
+    builder: (context) {
+      return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Center(child: Text('Edit Picture', style: TextStyle(fontWeight: FontWeight.bold))),
+        content: const Text('Choose an option to set your profile picture.', textAlign: TextAlign.center),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              ListTile(
-                leading: const Icon(Icons.photo_library, color: Color(0xFF20C997)),
-                title: const Text('Choose from Gallery'),
-                onTap: () {
+              ElevatedButton.icon(
+                icon: const Icon(Icons.photo_library, color: Colors.white),
+                label: const Text('Gallery', style: TextStyle(color: Colors.white)),
+                onPressed: () {
                   Navigator.pop(context);
                   _pickImage(ImageSource.gallery);
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF20C997),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
-              ListTile(
-                leading: const Icon(Icons.face, color: Color(0xFF20C997)),
-                title: const Text('Use Avatar'),
-                onTap: () {
+              const SizedBox(width: 16),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.face, color: Colors.white),
+                label: const Text('Avatar', style: TextStyle(color: Colors.white)),
+                onPressed: () {
                   Navigator.pop(context);
                   _showAvatarPicker();
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF20C997),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
               ),
             ],
           ),
-        );
-      },
-    );
-  }
+        ],
+      );
+    },
+  );
+}
+
 
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();

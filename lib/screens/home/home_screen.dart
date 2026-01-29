@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:safechain/screens/notification/notification_screen.dart';
+import 'package:safechain/services/notification_service.dart';
 import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/screens/add_device/add_device_flow.dart';
 import 'package:safechain/screens/announcement/announcement_screen.dart';
@@ -37,17 +39,32 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  int _unreadNotifications = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _updateNotificationCount();
+  }
+
+  Future<void> _updateNotificationCount() async {
+    final count = await NotificationService.getUnreadCount();
+    setState(() => _unreadNotifications = count);
+  }
 
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
     });
+    if (index != 0) { // Assuming DevicesContent is at index 0
+      _updateNotificationCount();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final List<Widget> widgetOptions = <Widget>[
-      const DevicesContent(),
+      DevicesContent(updateNotificationCount: _updateNotificationCount),
       const GuideScreen(),
       const AnnouncementScreen(),
       const ProfileScreen(),
@@ -58,6 +75,9 @@ class _HomeScreenState extends State<HomeScreen> {
       body: AnimatedSwitcher(
         duration: const Duration(milliseconds: 300),
         child: widgetOptions.elementAt(_selectedIndex),
+        transitionBuilder: (Widget child, Animation<double> animation) {
+          return FadeTransition(opacity: animation, child: child);
+        },
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -103,7 +123,8 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 class DevicesContent extends StatefulWidget {
-  const DevicesContent({super.key});
+  final Future<void> Function() updateNotificationCount;
+  const DevicesContent({super.key, required this.updateNotificationCount});
 
   @override
   State<DevicesContent> createState() => _DevicesContentState();
@@ -112,11 +133,13 @@ class DevicesContent extends StatefulWidget {
 class _DevicesContentState extends State<DevicesContent> {
   Future<List<Device>>? _devicesFuture;
   UserModel? _currentUser;
+  int _unreadNotifications = 0;
 
   @override
   void initState() {
     super.initState();
     _loadData();
+    _updateCount();
   }
 
   Future<void> _loadData() async {
@@ -126,6 +149,18 @@ class _DevicesContentState extends State<DevicesContent> {
         _currentUser = user;
         _devicesFuture = _fetchDevices(user.residentId);
       });
+    }
+  }
+
+  Future<void> _updateCount() async {
+    final count = await NotificationService.getUnreadCount();
+    setState(() => _unreadNotifications = count);
+  }
+
+  Future<void> _navigateAndRefresh() async {
+    final result = await Navigator.push(context, FadePageRoute(child: const NotificationScreen()));
+    if (result == true) {
+      _updateCount();
     }
   }
 
@@ -193,19 +228,28 @@ class _DevicesContentState extends State<DevicesContent> {
                                   ),
                                 ],
                               ),
-                              Stack(
-                                clipBehavior: Clip.none,
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.all(10),
-                                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(15)),
-                                    child: Image.asset('images/Bell.png', height: 24, color: Colors.white),
-                                  ),
-                                  Positioned(
-                                    right: -4, top: -4,
-                                    child: Container(padding: const EdgeInsets.all(4), decoration: const BoxDecoration(color: Color(0xFFF87171), shape: BoxShape.circle), child: const Text('3', style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
-                                  ),
-                                ],
+                              GestureDetector(
+                                onTap: _navigateAndRefresh,
+                                child: Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.all(10),
+                                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: BorderRadius.circular(15)),
+                                      child: Image.asset('images/Bell.png', height: 24, color: Colors.white),
+                                    ),
+                                    if (_unreadNotifications > 0)
+                                      Positioned(
+                                        right: -4,
+                                        top: -4,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(4),
+                                          decoration: const BoxDecoration(color: Color(0xFFF87171), shape: BoxShape.circle),
+                                          child: Text('$_unreadNotifications', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
