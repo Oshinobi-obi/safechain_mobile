@@ -52,11 +52,11 @@ try {
         $mail->isSMTP();
         $mail->Host       = 'smtp.gmail.com';
         $mail->SMTPAuth   = true;
-        $mail->Username   = 'intertas.mico.dichoso@gmail.com';
-        $mail->Password   = 'wrkx cvqd xiqb gdtw';
+        $mail->Username   = '';
+        $mail->Password   = '';
         $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
         $mail->Port       = 587;
-        $mail->setFrom('intertas.mico.dichoso@gmail.com', 'SafeChain Support');
+        $mail->setFrom('', '');
         $mail->addAddress($email);
         $reset_link = "https://safechain.site/reset-password-page?token=" . $token;
         $mail->isHTML(true);
