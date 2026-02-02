@@ -22,17 +22,24 @@ if (!$email || !$password) {
 }
 
 try {
-    $stmt = $conn->prepare("SELECT resident_id, name, email, password, address, contact FROM residents WHERE email = ? AND is_archived = 0");
+    $stmt = $conn->prepare("SELECT resident_id, name, email, password, address, contact, medical_conditions, profile_picture_url, avatar FROM residents WHERE email = ? AND is_archived = 0");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if ($result->num_rows === 1) {
         $user = $result->fetch_assoc();
-        
+
         if (password_verify($password, $user['password'])) {
             http_response_code(200);
             unset($user['password']);
+            if (isset($user['medical_conditions'])) {
+                $decoded = json_decode($user['medical_conditions'], true);
+                $user['medical_conditions'] = is_array($decoded) ? $decoded : [];
+            } else {
+                $user['medical_conditions'] = [];
+            }
+
             echo json_encode([
                 'status' => 'success',
                 'message' => 'Login successful.',

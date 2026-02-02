@@ -42,18 +42,38 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeData();
+  }
+
+  Future<void> _initializeData() async {
     _nameController = TextEditingController(text: widget.userData.name);
     _emailController = TextEditingController(text: widget.userData.email);
     _contactController = TextEditingController(text: widget.userData.contact);
     _addressController = TextEditingController(text: widget.userData.address);
-    _selectedConditions = List<String>.from(widget.userData.medicalConditions);
+
+    try {
+      if (widget.userData.medicalConditions.isNotEmpty) {
+        _selectedConditions = List<String>.from(widget.userData.medicalConditions);
+      }
+    } catch (e) {
+      debugPrint("Error parsing medical conditions: $e");
+      _selectedConditions = [];
+    }
+
     _avatar = widget.userData.avatar;
+
+    if (_avatar != null && _avatar!.isNotEmpty) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('fluttermoji', _avatar!);
+    }
 
     if (_contactController.text.isNotEmpty) {
       _contactController.text = PhoneNumberFormatter()
           .formatEditUpdate(TextEditingValue.empty, _contactController.value)
           .text;
     }
+
+    if (mounted) setState(() {});
   }
 
   @override
@@ -78,7 +98,8 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     request.fields['medical_conditions'] = jsonEncode(_selectedConditions);
 
     if (_image != null) {
-      request.files.add(await http.MultipartFile.fromPath('profile_picture', _image!.path));
+      request.files.add(
+          await http.MultipartFile.fromPath('profile_picture', _image!.path));
     } else if (_avatar != null) {
       request.fields['avatar'] = _avatar!;
     }
@@ -86,6 +107,13 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     try {
       final response = await request.send();
       final responseBody = await response.stream.bytesToString();
+      print("Update Response Status: ${response.statusCode}");
+      print("Update Response Body: $responseBody");
+
+      if (responseBody.isEmpty) {
+        throw const FormatException('Server returned an empty response.');
+      }
+
       final decodedBody = jsonDecode(responseBody);
       final message = decodedBody['message'] ?? 'An error occurred.';
 
@@ -96,20 +124,27 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
           final updatedUser = UserModel.fromJson(decodedBody['user']);
           await SessionManager.saveUser(updatedUser);
         }
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.green));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message), backgroundColor: Colors.green));
         Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(message), backgroundColor: Colors.red));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An unexpected error occurred: $e')));
+        String errorMessage = 'An unexpected error occurred: $e';
+        if (e is FormatException) {
+          errorMessage =
+          'Invalid server response. Please check the debug logs.';
+        }
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(errorMessage)));
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
   }
-
 
   void _showMedicalConditions() {
     showModalBottomSheet(
@@ -161,7 +196,9 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                               onChanged: (bool? value) {
                                 setModalState(() {
                                   if (value == true) {
-                                    _selectedConditions.add(condition);
+                                    if (!_selectedConditions.contains(condition)) {
+                                      _selectedConditions.add(condition);
+                                    }
                                   } else {
                                     _selectedConditions.remove(condition);
                                   }
@@ -188,51 +225,50 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
   }
 
   void _showPictureOptions() {
-  showDialog(
-    context: context,
-    builder: (context) {
-      return AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Center(child: Text('Edit Picture', style: TextStyle(fontWeight: FontWeight.bold))),
-        content: const Text('Choose an option to set your profile picture.', textAlign: TextAlign.center),
-        actionsAlignment: MainAxisAlignment.center,
-        actions: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              ElevatedButton.icon(
-                icon: const Icon(Icons.photo_library, color: Colors.white),
-                label: const Text('Gallery', style: TextStyle(color: Colors.white)),
-                onPressed: () {
-                  Navigator.pop(context);
-                  _pickImage(ImageSource.gallery);
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF20C997),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Center(child: Text('Edit Picture', style: TextStyle(fontWeight: FontWeight.bold))),
+          content: const Text('Choose an option to set your profile picture.', textAlign: TextAlign.center),
+          actionsAlignment: MainAxisAlignment.center,
+          actions: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.photo_library, color: Colors.white),
+                  label: const Text('Gallery', style: TextStyle(color: Colors.white)),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _pickImage(ImageSource.gallery);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF20C997),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.face, color: Colors.white),
-                label: const Text('Avatar', style: TextStyle(color: Colors.white)),
-                onPressed: () {
-                  Navigator.pop(context);
-                  _showAvatarPicker();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF20C997),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                const SizedBox(width: 16),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.face, color: Colors.white),
+                  label: const Text('Avatar', style: TextStyle(color: Colors.white)),
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _showAvatarPicker();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF20C997),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
-      );
-    },
-  );
-}
-
+              ],
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Future<void> _pickImage(ImageSource source) async {
     final picker = ImagePicker();
@@ -245,11 +281,8 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
     }
   }
 
-
   void _showAvatarPicker() async {
     final fluttermojiController = FluttermojiFunctions();
-    String backupSvg = await fluttermojiController.encodeMySVGtoString();
-
     showDialog(
       context: context,
       builder: (context) {
@@ -273,9 +306,7 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () async {
-                final prefs = await SharedPreferences.getInstance();
-                await prefs.setString('fluttermoji', backupSvg);
+              onPressed: () {
                 Navigator.pop(context);
               },
               child: const Text('Cancel', style: TextStyle(color: Colors.red)),
@@ -328,26 +359,26 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
                       border: Border.all(color: const Color(0xFF20C997), width: 3),
                     ),
                     child: CircleAvatar(
-                        radius: 55,
-                        backgroundColor: const Color(0xFFE6F9F3),
-                        backgroundImage: _image != null ? FileImage(_image!) : null,
-                        child: _image == null && _avatar != null
+                      radius: 55,
+                      backgroundColor: const Color(0xFFE6F9F3),
+                      backgroundImage: _image != null ? FileImage(_image!) : null,
+                      child: _image == null
+                          ? (_avatar != null && _avatar!.isNotEmpty)
                           ? FluttermojiCircleAvatar(
-                            radius: 55,
-                            backgroundColor: Colors.grey[200],
-                          )
-                          : _image == null && widget.userData.profilePictureUrl != null && widget.userData.profilePictureUrl!.isNotEmpty
-                              ? ClipOval(
-                                child: Image.network(
-                                  widget.userData.profilePictureUrl!,
-                                  fit: BoxFit.cover,
-                                  width: 110,
-                                  height: 110,
-                                ),
-                              )
-                              : _image == null && (_avatar == null || _avatar!.isEmpty) && (widget.userData.profilePictureUrl == null || widget.userData.profilePictureUrl!.isEmpty)
-                                ? const Icon(Icons.person, size: 50, color: Colors.grey)
-                                : null,
+                        radius: 55,
+                        backgroundColor: Colors.grey[200],
+                      )
+                          : (widget.userData.profilePictureUrl != null && widget.userData.profilePictureUrl!.isNotEmpty)
+                          ? ClipOval(
+                        child: Image.network(
+                          widget.userData.profilePictureUrl!,
+                          fit: BoxFit.cover,
+                          width: 110,
+                          height: 110,
+                        ),
+                      )
+                          : const Icon(Icons.person, size: 50, color: Colors.grey)
+                          : null,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -384,7 +415,10 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
             _buildInputField('Address', _addressController),
             const SizedBox(height: 24),
             _buildDropdownField(
-                'Specific Medical Condition', _selectedConditions.join(', '), _showMedicalConditions),
+                'Specific Medical Condition',
+                _selectedConditions.isEmpty ? 'Select your condition' : _selectedConditions.join(', '),
+                _showMedicalConditions
+            ),
             const SizedBox(height: 20),
           ],
         ),
@@ -402,15 +436,15 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
             ),
             child: _isLoading
                 ? const SizedBox(
-                    height: 24,
-                    width: 24,
-                    child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                  )
+              height: 24,
+              width: 24,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            )
                 : const Text('Save Changes',
-                    style: TextStyle(
-                        fontSize: 18,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold)),
+                style: TextStyle(
+                    fontSize: 18,
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold)),
           ),
         ),
       ),

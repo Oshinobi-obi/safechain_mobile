@@ -24,22 +24,33 @@ class UserModel {
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
     List<String> conditions = [];
-    if (json['medical_conditions'] != null && json['medical_conditions'].isNotEmpty) {
-      final decodedConditions = jsonDecode(json['medical_conditions']);
-      if (decodedConditions is List) {
-        conditions = List<String>.from(decodedConditions);
+
+    var rawConditions = json['medical_conditions'];
+
+    if (rawConditions != null) {
+      if (rawConditions is List) {
+        conditions = List<String>.from(rawConditions.map((e) => e.toString()));
+      } else if (rawConditions is String && rawConditions.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(rawConditions);
+          if (decoded is List) {
+            conditions = List<String>.from(decoded.map((e) => e.toString()));
+          }
+        } catch (e) {
+          print('Error parsing medical_conditions: $e');
+        }
       }
     }
 
     return UserModel(
-      residentId: json['resident_id'] ?? '',
-      name: json['name'] ?? '',
-      email: json['email'] ?? '',
-      address: json['address'] ?? '',
-      contact: json['contact'] ?? '',
+      residentId: json['resident_id']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      email: json['email']?.toString() ?? '',
+      address: json['address']?.toString() ?? '',
+      contact: json['contact']?.toString() ?? '',
       medicalConditions: conditions,
-      profilePictureUrl: json['profile_picture_url'],
-      avatar: json['avatar'],
+      profilePictureUrl: json['profile_picture_url']?.toString(),
+      avatar: json['avatar']?.toString(),
     );
   }
 
@@ -62,7 +73,7 @@ class SessionManager {
 
   static Future<void> saveUser(UserModel user) async {
     final prefs = await SharedPreferences.getInstance();
-    final userJson = jsonEncode(user.toJson()); 
+    final userJson = jsonEncode(user.toJson());
     await prefs.setString(_userKey, userJson);
   }
 
@@ -70,7 +81,12 @@ class SessionManager {
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString(_userKey);
     if (userJson != null) {
-      return UserModel.fromJson(jsonDecode(userJson));
+      try {
+        return UserModel.fromJson(jsonDecode(userJson));
+      } catch (e) {
+        await logout();
+        return null;
+      }
     }
     return null;
   }
