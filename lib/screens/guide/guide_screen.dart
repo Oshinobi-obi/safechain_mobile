@@ -30,8 +30,7 @@ class GuideScreen extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 32),
-            
-            // Video Preview Card
+
             Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -93,7 +92,6 @@ class GuideScreen extends StatelessWidget {
             ),
             const SizedBox(height: 24),
 
-            // Accordion Items
             _buildGuideItem(
               'Emergency Buttons',
               'images/warning-red.png',

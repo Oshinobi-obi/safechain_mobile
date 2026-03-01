@@ -10,6 +10,7 @@ import 'package:safechain/screens/guide/guide_screen.dart';
 import 'package:safechain/screens/profile/profile_screen.dart';
 import 'package:safechain/widgets/battery_indicator.dart';
 import 'package:safechain/widgets/fade_page_route.dart';
+import 'package:safechain/screens/tracking/device_tracking_screen.dart';
 import 'package:fluttermoji/fluttermoji.dart';
 
 class Device {
@@ -56,7 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _selectedIndex = index;
     });
-    if (index != 0) { // Assuming DevicesContent is at index 0
+    if (index != 0) {
       _updateNotificationCount();
     }
   }
@@ -178,6 +179,210 @@ class _DevicesContentState extends State<DevicesContent> {
     throw Exception('Failed to load devices');
   }
 
+  void _refreshDevices() {
+    if (_currentUser != null) {
+      setState(() {
+        _devicesFuture = _fetchDevices(_currentUser!.residentId);
+      });
+    }
+  }
+
+  // ── SAVE: rename a device via API ──────────────────────────────
+  Future<void> _renameDevice(int deviceId, String newName) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://safechain.site/api/mobile/update_device.php'),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode({'device_id': deviceId, 'name': newName}),
+      );
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['status'] == 'success') {
+        _refreshDevices();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Device name updated!'), backgroundColor: Color(0xFF20C997)),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(body['message'] ?? 'Failed to update name.'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Network error. Please try again.'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  // ── UNLINK: delete a device via API ────────────────────────────
+  Future<void> _unlinkDevice(int deviceId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://safechain.site/api/mobile/delete_device.php'),
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode({'device_id': deviceId}),
+      );
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['status'] == 'success') {
+        _refreshDevices();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Device unlinked successfully.'), backgroundColor: Color(0xFF20C997)),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(body['message'] ?? 'Failed to unlink device.'), backgroundColor: Colors.red),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Network error. Please try again.'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
+  void _showDeviceSettings(BuildContext context, Device device) {
+    final TextEditingController nameController = TextEditingController(text: device.name);
+    bool isSaving = false;
+    bool isUnlinking = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.only(
+          topLeft: Radius.circular(20.0),
+          topRight: Radius.circular(20.0),
+        ),
+      ),
+      builder: (BuildContext bc) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                // viewInsets.bottom = keyboard height
+                // padding.bottom    = system navigation bar height
+                bottom: MediaQuery.of(bc).viewInsets.bottom + MediaQuery.of(bc).padding.bottom,
+                left: 24,
+                right: 24,
+                top: 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  // Handle bar
+                  Center(
+                    child: Container(
+                      width: 40, height: 4,
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(99)),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Device Settings',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'ID: ${device.btRemoteId}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.grey, fontSize: 13),
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: 'Device Name',
+                      filled: true,
+                      fillColor: const Color(0xFFF1F5F9),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // ── SAVE BUTTON ──
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF20C997),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    onPressed: isSaving ? null : () async {
+                      final newName = nameController.text.trim();
+                      if (newName.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Device name cannot be empty.')),
+                        );
+                        return;
+                      }
+                      setModalState(() => isSaving = true);
+                      Navigator.pop(bc);
+                      await _renameDevice(device.deviceId, newName);
+                    },
+                    child: isSaving
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                        : const Text('Save', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // ── UNLINK BUTTON ──
+                  TextButton(
+                    onPressed: isUnlinking ? null : () async {
+                      // Confirm dialog before unlinking
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Unlink Device'),
+                          content: Text('Are you sure you want to unlink "${device.name}"? This cannot be undone.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Unlink', style: TextStyle(color: Colors.red)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        setModalState(() => isUnlinking = true);
+                        Navigator.pop(bc);
+                        await _unlinkDevice(device.deviceId);
+                      }
+                    },
+                    child: isUnlinking
+                        ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.red, strokeWidth: 2))
+                        : const Text('Unlink Device', style: TextStyle(color: Colors.red, fontSize: 16)),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final String fullName = _currentUser?.name ?? 'User';
@@ -268,15 +473,15 @@ class _DevicesContentState extends State<DevicesContent> {
                                 ),
                               ),
                               const SizedBox(width: 12),
-                               Container(
+                              Container(
                                 padding: const EdgeInsets.all(2),
                                 decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.3), width: 2)),
                                 child: CircleAvatar(
                                   radius: 35,
                                   backgroundColor: Colors.white30,
                                   child: _currentUser?.avatar != null
-                                    ? FluttermojiCircleAvatar(radius: 35,)
-                                    : _currentUser?.profilePictureUrl != null
+                                      ? FluttermojiCircleAvatar(radius: 35,)
+                                      : _currentUser?.profilePictureUrl != null
                                       ? ClipOval(child: Image.network(_currentUser!.profilePictureUrl!, fit: BoxFit.cover, width: 70, height: 70,))
                                       : const Icon(Icons.person, size: 35, color: Colors.white),
                                 ),
@@ -298,8 +503,9 @@ class _DevicesContentState extends State<DevicesContent> {
                                   ],
                                 ),
                                 ElevatedButton.icon(
-                                  onPressed: () {
-                                    Navigator.push(context, FadePageRoute(child: const AddDeviceFlow()));
+                                  onPressed: () async {
+                                    await Navigator.push(context, FadePageRoute(child: const AddDeviceFlow()));
+                                    _refreshDevices(); // refresh after returning from add flow
                                   },
                                   icon: const Icon(Icons.add, color: Color(0xFF20C997), size: 20),
                                   label: const Text('Add Device', style: TextStyle(color: Color(0xFF20C997), fontWeight: FontWeight.bold)),
@@ -316,9 +522,9 @@ class _DevicesContentState extends State<DevicesContent> {
               ),
               if (snapshot.connectionState == ConnectionState.waiting)
                 const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(32.0), child: Center(child: CircularProgressIndicator(color: Color(0xFF20C997))))),
-              
+
               if (snapshot.hasError)
-                 SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(32.0), child: Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.red))))),
+                SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(32.0), child: Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.red))))),
 
               if (devices.isEmpty && snapshot.connectionState != ConnectionState.waiting && !snapshot.hasError)
                 const SliverToBoxAdapter(
@@ -333,7 +539,7 @@ class _DevicesContentState extends State<DevicesContent> {
                   padding: const EdgeInsets.all(24),
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
-                      (context, index) {
+                          (context, index) {
                         final device = devices[index];
                         return Padding(padding: const EdgeInsets.only(bottom: 16.0), child: _buildDeviceCard(context, device));
                       },
@@ -381,7 +587,17 @@ class _DevicesContentState extends State<DevicesContent> {
             children: [
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                        context,
+                        FadePageRoute(
+                            child: DeviceTrackingScreen(
+                              deviceId: device.btRemoteId,
+                              deviceName: device.name,
+                            )
+                        )
+                    );
+                  },
                   icon: Image.asset('images/gps-icon.png', width: 20, color: Colors.white),
                   label: const Text('Test GPS', style: TextStyle(color: Colors.white, fontSize: 16)),
                   style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF20C997), padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
@@ -390,7 +606,7 @@ class _DevicesContentState extends State<DevicesContent> {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton.icon(
-                  onPressed: () {},
+                  onPressed: () => _showDeviceSettings(context, device),
                   icon: Image.asset('images/gear-icon.png', width: 20, color: Colors.grey),
                   label: const Text('Settings', style: TextStyle(color: Colors.grey, fontSize: 16)),
                   style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), side: BorderSide(color: Colors.grey.shade200, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
