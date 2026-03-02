@@ -12,6 +12,8 @@ import 'package:safechain/widgets/battery_indicator.dart';
 import 'package:safechain/widgets/fade_page_route.dart';
 import 'package:safechain/screens/tracking/device_tracking_screen.dart';
 import 'package:fluttermoji/fluttermoji.dart';
+import 'dart:async';
+import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 
 class Device {
   final int deviceId;
@@ -553,68 +555,202 @@ class _DevicesContentState extends State<DevicesContent> {
   }
 
   Widget _buildDeviceCard(BuildContext context, Device device) {
+    return DeviceCard(
+      device: device,
+      onSettingsPressed: () => _showDeviceSettings(context, device),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────
+// DEVICE CARD (STATEFUL FOR BLUETOOTH TRACKING)
+// ─────────────────────────────────────────────────
+class DeviceCard extends StatefulWidget {
+  final Device device;
+  final VoidCallback onSettingsPressed;
+
+  const DeviceCard({super.key, required this.device, required this.onSettingsPressed});
+
+  @override
+  State<DeviceCard> createState() => _DeviceCardState();
+}
+
+class _DeviceCardState extends State<DeviceCard> {
+  late BluetoothDevice _bleDevice;
+  StreamSubscription<BluetoothConnectionState>? _connectionSubscription;
+  BluetoothConnectionState _connectionState = BluetoothConnectionState.disconnected;
+  bool _isConnecting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _bleDevice = BluetoothDevice.fromId(widget.device.btRemoteId);
+
+    // Listen to the connection state of this specific device
+    _connectionSubscription = _bleDevice.connectionState.listen((state) {
+      if (mounted) {
+        setState(() {
+          _connectionState = state;
+          _isConnecting = false; // Stop loading spinner if state resolves
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _connectionSubscription?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _toggleConnection() async {
+    // Prevent spam clicking
+    if (_isConnecting) return;
+
+    if (_connectionState == BluetoothConnectionState.connected) {
+      // --- NEW CONFIRMATION LAYER ---
+      final bool? confirm = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Disconnect Device'),
+          content: Text('Are you sure you want to disconnect from ${widget.device.name}?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('Disconnect', style: TextStyle(color: Colors.red)),
+            ),
+          ],
+        ),
+      );
+
+      // Only disconnect if the user explicitly clicked "Disconnect"
+      if (confirm == true) {
+        await _bleDevice.disconnect();
+      }
+    } else {
+      // If disconnected, try to connect immediately (no confirmation needed)
+      setState(() => _isConnecting = true);
+      try {
+        await _bleDevice.connect(timeout: const Duration(seconds: 5));
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isConnecting = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Could not connect to ${widget.device.name}. Is it turned on?'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Determine colors based on connection state
+    final bool isConnected = _connectionState == BluetoothConnectionState.connected;
+    final Color statusColor = _isConnecting
+        ? Colors.orange
+        : (isConnected ? const Color(0xFF20C997) : Colors.grey);
+    final String statusText = _isConnecting
+        ? 'Connecting...'
+        : (isConnected ? 'Connected' : 'Disconnected (Tap to connect)');
+
     return Container(
-      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 10, offset: const Offset(0, 5))],
       ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(color: const Color(0xFFE6F9F3), borderRadius: BorderRadius.circular(15)),
-                child: Image.asset('images/mobile-active.png', width: 28),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: _toggleConnection, // Tap anywhere on the card to connect/disconnect
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                Row(
                   children: [
-                    Text(device.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                    Text('ID: ${device.btRemoteId}', style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: const Color(0xFFE6F9F3), borderRadius: BorderRadius.circular(15)),
+                      child: Image.asset('images/mobile-active.png', width: 28),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(widget.device.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                          Text('ID: ${widget.device.btRemoteId}', style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                          const SizedBox(height: 6),
+
+                          // --- NEW CONNECTION STATUS INDICATOR ---
+                          Row(
+                            children: [
+                              Container(
+                                width: 8, height: 8,
+                                decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                statusText,
+                                style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
+                              ),
+                            ],
+                          ),
+                          // ---------------------------------------
+
+                        ],
+                      ),
+                    ),
+                    BatteryIndicator(charge: widget.device.battery),
                   ],
                 ),
-              ),
-              BatteryIndicator(charge: device.battery),
-            ],
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                        context,
-                        FadePageRoute(
-                            child: DeviceTrackingScreen(
-                              deviceId: device.btRemoteId,
-                              deviceName: device.name,
-                            )
-                        )
-                    );
-                  },
-                  icon: Image.asset('images/gps-icon.png', width: 20, color: Colors.white),
-                  label: const Text('Test GPS', style: TextStyle(color: Colors.white, fontSize: 16)),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF20C997), padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: () {
+                          Navigator.push(
+                              context,
+                              FadePageRoute(
+                                  child: DeviceTrackingScreen(
+                                    deviceId: widget.device.btRemoteId,
+                                    deviceName: widget.device.name,
+                                  )
+                              )
+                          );
+                        },
+                        icon: Image.asset('images/gps-icon.png', width: 20, color: Colors.white),
+                        label: const Text('Test GPS', style: TextStyle(color: Colors.white, fontSize: 16)),
+                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF20C997), padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: widget.onSettingsPressed,
+                        icon: Image.asset('images/gear-icon.png', width: 20, color: Colors.grey),
+                        label: const Text('Settings', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), side: BorderSide(color: Colors.grey.shade200, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showDeviceSettings(context, device),
-                  icon: Image.asset('images/gear-icon.png', width: 20, color: Colors.grey),
-                  label: const Text('Settings', style: TextStyle(color: Colors.grey, fontSize: 16)),
-                  style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 12), side: BorderSide(color: Colors.grey.shade200, width: 1.5), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

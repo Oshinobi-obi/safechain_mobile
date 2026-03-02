@@ -146,7 +146,8 @@ class _DeviceTrackingScreenState extends State<DeviceTrackingScreen> {
   void dispose() {
     _notifySubscription?.cancel();
     _stateSubscription?.cancel();
-    _device?.disconnect();
+    //_device?.disconnect();
+    // remains active in the background for the Home Screen to use.
     super.dispose();
   }
 

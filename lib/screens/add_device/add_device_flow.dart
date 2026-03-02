@@ -35,14 +35,7 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
   @override
   void initState() {
     super.initState();
-    _checkBluetoothAndStart();
-  }
-
-  Future<void> _checkBluetoothAndStart() async {
-    final state = FlutterBluePlus.adapterStateNow;
-    if (state == BluetoothAdapterState.on) {
-      if (mounted) setState(() => _currentIndex = 1);
-    }
+    // Removed the auto-Bluetooth check so the app always starts at the QR instructions
   }
 
   void _nextStep() => setState(() => _currentIndex++);
@@ -54,10 +47,7 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
     if (user == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('You must be logged in to add a device.'),
-            backgroundColor: Colors.red,
-          ),
+          const SnackBar(content: Text('You must be logged in to add a device.'), backgroundColor: Colors.red),
         );
       }
       return;
@@ -66,10 +56,7 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
     if (_scannedBtRemoteId == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('No device scanned. Please scan the QR code first.'),
-            backgroundColor: Colors.red,
-          ),
+          const SnackBar(content: Text('No device scanned. Please scan the QR code first.'), backgroundColor: Colors.red),
         );
       }
       return;
@@ -79,10 +66,7 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
 
     try {
       final checkResponse = await http.get(
-        Uri.parse(
-          'https://safechain.site/api/mobile/check_device.php'
-              '?bt_remote_id=$btRemoteId&resident_id=${user.residentId}',
-        ),
+        Uri.parse('https://safechain.site/api/mobile/check_device.php?bt_remote_id=$btRemoteId&resident_id=${user.residentId}'),
       );
 
       if (checkResponse.statusCode == 200) {
@@ -94,23 +78,9 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
               context: context,
               builder: (ctx) => AlertDialog(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                title: const Row(
-                  children: [
-                    Icon(Icons.link_off, color: Colors.red),
-                    SizedBox(width: 8),
-                    Text('Device Already Linked'),
-                  ],
-                ),
-                content: const Text(
-                  'This device is already linked to another account. '
-                      'Please use a different device or contact support.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('OK', style: TextStyle(color: kPrimaryGreen)),
-                  ),
-                ],
+                title: const Row(children: [Icon(Icons.link_off, color: Colors.red), SizedBox(width: 8), Text('Device Already Linked')]),
+                content: const Text('This device is already linked to another account. Please use a different device or contact support.'),
+                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK', style: TextStyle(color: kPrimaryGreen)))],
               ),
             );
           }
@@ -123,23 +93,9 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
               context: context,
               builder: (ctx) => AlertDialog(
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                title: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: kPrimaryGreen),
-                    SizedBox(width: 8),
-                    Text('Already Added'),
-                  ],
-                ),
-                content: const Text(
-                  'This device is already linked to your account. '
-                      'You can find it in your device list.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(ctx),
-                    child: const Text('OK', style: TextStyle(color: kPrimaryGreen)),
-                  ),
-                ],
+                title: const Row(children: [Icon(Icons.info_outline, color: kPrimaryGreen), SizedBox(width: 8), Text('Already Added')]),
+                content: const Text('This device is already linked to your account. You can find it in your device list.'),
+                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK', style: TextStyle(color: kPrimaryGreen)))],
               ),
             );
           }
@@ -168,7 +124,7 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
           NotificationType.device,
         );
       }
-      _nextStep();
+      _nextStep(); // Moves to TestingGatewayStep
     } catch (e) {
       _nextStep();
     }
@@ -177,34 +133,48 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
   @override
   Widget build(BuildContext context) {
     final List<Widget> pages = [
-      EnableBluetoothStep(
-        onEnable: () => _goToStep(1),
-        onSkip: () => Navigator.pushReplacement(context, FadePageRoute(child: const HomeScreen())),
-      ),
+      // 0. Start Here
       PairYourDeviceStep(
-        onStart: () => _goToStep(2),
+        onStart: () => _goToStep(1),
         onBack: () => Navigator.pop(context),
       ),
+      // 1. Scan QR
       QRScanStep(
         onScanned: (btRemoteId) {
           setState(() => _scannedBtRemoteId = btRemoteId);
-          _goToStep(3);
+          _goToStep(2);
         },
-        onCancel: () => _goToStep(1),
+        onCancel: () => _goToStep(0),
       ),
+      // 2. Ask BT Permissions (If already on, user taps Enable to pass)
+      EnableBluetoothStep(
+        onEnable: () => _goToStep(3),
+        onSkip: () => _goToStep(3),
+      ),
+      // 3. Local Verification (Now has Visual Feedback)
+      ConnectingDeviceStep(
+        btRemoteId: _scannedBtRemoteId,
+        onSuccess: () => _goToStep(4),
+        onError: () => _goToStep(8),
+      ),
+      // 4. Cloud Registration
       SetUpDeviceStep(
         btRemoteId: _scannedBtRemoteId,
-        onAdd: _addDevice,
-        onCancel: () => _goToStep(1),
+        onAdd: _addDevice, // Internal API call moves index to 5
+        onCancel: () => _goToStep(0),
         onNameChanged: (name) => setState(() => _deviceName = name),
       ),
-      TestingGatewayStep(onSuccess: () => _goToStep(5), onError: () => _goToStep(7)),
+      // 5. Gateway Test
+      TestingGatewayStep(onSuccess: () => _goToStep(6), onError: () => _goToStep(8)),
+      // 6. Success Summary
       AllSetStep(
-        onTestGps: () => _goToStep(6),
+        onTestGps: () => _goToStep(7),
         onGoToDeviceList: () => Navigator.pushReplacement(context, FadePageRoute(child: const HomeScreen())),
       ),
-      GpsTestingStep(btRemoteId: _scannedBtRemoteId, onBack: () => _goToStep(5)),
-      ConnectionUnsuccessfulStep(onTryAgain: () => _goToStep(4), onViewMap: () {}),
+      // 7. Location Testing
+      GpsTestingStep(btRemoteId: _scannedBtRemoteId, onBack: () => _goToStep(6)),
+      // 8. Error Screen
+      ConnectionUnsuccessfulStep(onTryAgain: () => _goToStep(1), onViewMap: () {}),
     ];
 
     return Scaffold(
@@ -1193,6 +1163,103 @@ class _GpsTestingStepState extends State<GpsTestingStep> {
         const SizedBox(height: 4),
         Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
       ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────
+// CONNECTING DEVICE STEP (INDUSTRY STANDARD LOCAL VERIFICATION)
+// ─────────────────────────────────────────────────
+enum ConnectionPhase { connecting, success, error }
+
+class ConnectingDeviceStep extends StatefulWidget {
+  final String? btRemoteId;
+  final VoidCallback onSuccess;
+  final VoidCallback onError;
+
+  const ConnectingDeviceStep({
+    super.key,
+    required this.btRemoteId,
+    required this.onSuccess,
+    required this.onError
+  });
+
+  @override
+  State<ConnectingDeviceStep> createState() => _ConnectingDeviceStepState();
+}
+
+class _ConnectingDeviceStepState extends State<ConnectingDeviceStep> {
+  ConnectionPhase _phase = ConnectionPhase.connecting;
+
+  @override
+  void initState() {
+    super.initState();
+    _verifyLocalConnection();
+  }
+
+  Future<void> _verifyLocalConnection() async {
+    if (widget.btRemoteId == null) {
+      if (mounted) widget.onError();
+      return;
+    }
+
+    try {
+      // 1. Attempt local connection
+      final device = BluetoothDevice.fromId(widget.btRemoteId!);
+      await device.connect(timeout: const Duration(seconds: 7));
+
+      // 2. Disconnect to free up the radio
+      await device.disconnect();
+
+      // 3. Update UI to show Success to the user
+      if (mounted) {
+        setState(() => _phase = ConnectionPhase.success);
+
+        // Wait 2 seconds so the user can read the success message
+        await Future.delayed(const Duration(seconds: 2));
+
+        // Move to Setup screen
+        if (mounted) widget.onSuccess();
+      }
+
+    } catch (e) {
+      // Failed to connect
+      if (mounted) widget.onError();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          SizedBox(
+            height: 250,
+            child: Center(
+              child: _phase == ConnectionPhase.connecting
+                  ? const RipplePulse(color: kPrimaryBlue, icon: Icons.bluetooth_searching)
+                  : const RipplePulse(color: kPrimaryGreen, icon: Icons.bluetooth_connected),
+            ),
+          ),
+          Text(
+              _phase == ConnectionPhase.connecting ? 'Verifying Device...' : 'Device Connected! ✅',
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
+          ),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(
+                _phase == ConnectionPhase.connecting
+                    ? 'Ensuring your SafeChain device is turned on and nearby.'
+                    : 'Pairing successful. Moving to registration...',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.grey)
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
