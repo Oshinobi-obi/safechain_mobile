@@ -93,22 +93,26 @@ class GuideScreen extends StatelessWidget {
             const SizedBox(height: 24),
 
             _buildGuideItem(
+              context,
               'Emergency Buttons',
               'images/warning-red.png',
             ),
             _buildGuideItem(
+              context,
               'GPS Testing',
               'images/gps-blue.png',
             ),
             _buildGuideItem(
+              context,
               'Battery & Charging',
               'images/battery-green.png',
             ),
             _buildGuideItem(
+              context,
               'Troubleshooting',
               'images/wrench-orange.png',
             ),
-            
+
             const SizedBox(height: 24),
 
             // Support Card
@@ -179,7 +183,7 @@ class GuideScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildGuideItem(String title, String iconPath) {
+  Widget _buildGuideItem(BuildContext context, String title, String iconPath) {
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
@@ -193,27 +197,36 @@ class GuideScreen extends StatelessWidget {
           ),
         ],
       ),
-      child: Theme(
-        data: ThemeData().copyWith(dividerColor: Colors.transparent),
-        child: ExpansionTile(
-          leading: Image.asset(iconPath, width: 36),
-          title: Text(
-            title,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
-            ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: Theme(
+          data: Theme.of(context).copyWith(
+            dividerColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            hoverColor: Colors.transparent,
+            splashFactory: NoSplash.splashFactory,
           ),
-          children: const [
-            Padding(
-              padding: EdgeInsets.fromLTRB(72, 0, 24, 16),
-              child: Text(
-                'Information about this topic will appear here when expanded.',
-                style: TextStyle(color: Colors.grey),
+          child: ExpansionTile(
+            leading: Image.asset(iconPath, width: 36),
+            title: Text(
+              title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
               ),
             ),
-          ],
-        ),
+            children: const [
+              Padding(
+                padding: EdgeInsets.fromLTRB(72, 0, 24, 16),
+                child: Text(
+                  'Information about this topic will appear here when expanded.',
+                  style: TextStyle(color: Colors.grey),
+                ),
+              ),
+            ],
+          ),
+        ),  // ClipRRect
       ),
     );
   }

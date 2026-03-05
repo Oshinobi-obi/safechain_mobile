@@ -538,6 +538,11 @@ class _PersonalInformationScreenState extends State<PersonalInformationScreen> {
         const SizedBox(height: 12),
         InkWell(
           onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          hoverColor: Colors.transparent,
+          splashFactory: NoSplash.splashFactory,
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
             width: double.infinity,

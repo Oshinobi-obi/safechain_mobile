@@ -43,25 +43,38 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   int _unreadNotifications = 0;
+  Timer? _notifTimer;
+  StreamSubscription<int>? _notifStream;
 
   @override
   void initState() {
     super.initState();
     _updateNotificationCount();
+    // ── Real-time: react instantly when a notification is added ──
+    _notifStream = NotificationService.countStream.listen((count) {
+      if (mounted) setState(() => _unreadNotifications = count);
+    });
+    // ── Fallback poll every 5s (catches external events) ──
+    _notifTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _updateNotificationCount();
+    });
+  }
+
+  @override
+  void dispose() {
+    _notifTimer?.cancel();
+    _notifStream?.cancel();
+    super.dispose();
   }
 
   Future<void> _updateNotificationCount() async {
     final count = await NotificationService.getUnreadCount();
-    setState(() => _unreadNotifications = count);
+    if (mounted) setState(() => _unreadNotifications = count);
   }
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-    if (index != 0) {
-      _updateNotificationCount();
-    }
+    setState(() => _selectedIndex = index);
+    _updateNotificationCount();
   }
 
   @override
@@ -138,11 +151,29 @@ class _DevicesContentState extends State<DevicesContent> {
   UserModel? _currentUser;
   int _unreadNotifications = 0;
 
+  Timer? _notifTimer;
+  StreamSubscription<int>? _notifStream;
+
   @override
   void initState() {
     super.initState();
     _loadData();
     _updateCount();
+    // ── Real-time bell update via stream ──
+    _notifStream = NotificationService.countStream.listen((count) {
+      if (mounted) setState(() => _unreadNotifications = count);
+    });
+    // ── Fallback poll every 5s ──
+    _notifTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _updateCount();
+    });
+  }
+
+  @override
+  void dispose() {
+    _notifTimer?.cancel();
+    _notifStream?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -157,7 +188,7 @@ class _DevicesContentState extends State<DevicesContent> {
 
   Future<void> _updateCount() async {
     final count = await NotificationService.getUnreadCount();
-    setState(() => _unreadNotifications = count);
+    if (mounted) setState(() => _unreadNotifications = count);
   }
 
   Future<void> _navigateAndRefresh() async {
