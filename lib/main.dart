@@ -4,14 +4,11 @@ import 'package:app_links/app_links.dart';
 import 'package:flutter/material.dart';
 import 'package:safechain/screens/forgot_password/reset_password_screen.dart';
 import 'package:safechain/screens/startup/startup_screen.dart';
-import 'package:safechain/services/notification_service.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  // Initialize phone notification service on app startup
-  await NotificationService.initialize();
   runApp(const MyApp());
 }
 
