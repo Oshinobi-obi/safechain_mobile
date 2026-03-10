@@ -11,11 +11,10 @@ import 'package:safechain/firebase_options.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// ── Handle FCM background messages (app killed / background) ────
+// ── Background FCM handler (Android/iOS only) ────────────────────
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  // Show local notification when app is in background/killed
   final title = message.notification?.title ?? message.data['title'] ?? 'SafeChain';
   final body  = message.notification?.body  ?? message.data['body']  ?? '';
   if (title.isNotEmpty) {
@@ -26,10 +25,17 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
-  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  // Firebase only works on Android/iOS — skip on Windows/desktop
+  if (Platform.isAndroid || Platform.isIOS) {
+    await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  }
+
   await NotificationService.initialize();
-  await NotificationService.initializeFCM();
+
+  if (Platform.isAndroid || Platform.isIOS) {
+    await NotificationService.initializeFCM();
+  }
 
   runApp(const MyApp());
 }
@@ -49,10 +55,11 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
     _initDeepLinks();
-    _initFCMListeners();
+    if (Platform.isAndroid || Platform.isIOS) {
+      _initFCMListeners();
+    }
   }
 
-  // ── Listen for FCM messages when app is open (foreground) ─────
   void _initFCMListeners() {
     // App is in foreground — show local notification
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
@@ -63,9 +70,8 @@ class _MyAppState extends State<MyApp> {
       }
     });
 
-    // App was in background and user tapped the notification
+    // User tapped notification while app was in background
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      // Navigate to announcements tab
       navigatorKey.currentState?.pushNamedAndRemoveUntil('/', (route) => false);
     });
   }

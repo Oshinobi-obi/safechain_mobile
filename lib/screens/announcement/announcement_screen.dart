@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:safechain/services/notification_service.dart';
 import 'package:safechain/services/session_manager.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -71,18 +71,24 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   int _totalPages = 1;
 
   final ScrollController _scrollController = ScrollController();
-  static int? _lastNotifiedId;
+  final Set<int> _viewedIds = {};
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchAnnouncements();
     _scrollController.addListener(_onScroll);
+    // Auto-refresh every 30 seconds
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (mounted) _fetchAnnouncements(silent: true);
+    });
   }
 
   @override
   void dispose() {
     _scrollController.dispose();
+    _refreshTimer?.cancel();
     super.dispose();
   }
 
@@ -95,11 +101,14 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     }
   }
 
-  Future<void> _fetchAnnouncements({bool loadMore = false, bool refresh = false}) async {
+  Future<void> _fetchAnnouncements({bool loadMore = false, bool refresh = false, bool silent = false}) async {
     if (loadMore) {
       setState(() => _isLoadingMore = true);
-    } else {
+    } else if (!silent) {
       setState(() { _page = 1; _isLoading = true; _error = null; });
+    } else {
+      // Silent refresh — reset page without showing spinner
+      _page = 1;
     }
 
     final fetchPage = loadMore ? _page + 1 : 1;
@@ -115,10 +124,6 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
               .map((a) => Announcement.fromJson(a))
               .toList();
           final pagination = body['pagination'];
-
-          if (!loadMore && fetched.isNotEmpty) {
-            _notifyLatest(fetched.first);
-          }
 
           setState(() {
             if (loadMore) {
@@ -155,18 +160,18 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
     }
   }
 
-  Future<void> _notifyLatest(Announcement a) async {
-    if (_lastNotifiedId == a.id) return;
-    _lastNotifiedId = a.id;
-    await NotificationService.addNotification(
-      a.title, a.authorName, NotificationType.announcement,
-    );
-  }
 
   // ── Called by card when user expands — records view ──────────
   Future<void> _recordView(Announcement a) async {
+    // Skip if already recorded this session
+    if (_viewedIds.contains(a.id)) return;
+    _viewedIds.add(a.id);
+
     final user = await SessionManager.getUser();
-    if (user == null) return;
+    if (user == null) {
+      return;
+    }
+
 
     try {
       final response = await http.post(
@@ -180,10 +185,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       if (response.statusCode == 200) {
         final body = jsonDecode(response.body);
         if (body['success'] == true) {
-          setState(() => a.viewCount = body['view_count']);
+          if (mounted) setState(() => a.viewCount = body['view_count']);
         }
       }
-    } catch (_) {}
+    } catch (e) {
+    }
   }
 
   @override
@@ -232,9 +238,12 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                 child: Center(child: CircularProgressIndicator(color: kPrimaryGreen)),
               );
             }
+            // Record view as soon as card is visible on screen
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              _recordView(_announcements[index]);
+            });
             return _AnnouncementCard(
               announcement: _announcements[index],
-              onExpand: () => _recordView(_announcements[index]),
             );
           },
         ),
@@ -280,8 +289,7 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
 // ── Card ─────────────────────────────────────────────────────────
 class _AnnouncementCard extends StatefulWidget {
   final Announcement announcement;
-  final VoidCallback onExpand;
-  const _AnnouncementCard({required this.announcement, required this.onExpand});
+  const _AnnouncementCard({required this.announcement});
 
   @override
   State<_AnnouncementCard> createState() => _AnnouncementCardState();
@@ -293,7 +301,6 @@ class _AnnouncementCardState extends State<_AnnouncementCard> {
 
   void _toggle() {
     setState(() => _expanded = !_expanded);
-    if (_expanded) widget.onExpand(); // record view on first expand
   }
 
   @override
