@@ -447,7 +447,7 @@ class _DevicesContentState extends State<DevicesContent> {
                     Positioned(top: -50, right: -50, child: Container(width: 250, height: 250, decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle))),
                     Positioned(bottom: 20, left: -60, child: Container(width: 200, height: 200, decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), shape: BoxShape.circle))),
                     Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 60, 24, 32),
+                      padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 24, 24, 32),
                       child: Column(
                         children: [
                           Row(

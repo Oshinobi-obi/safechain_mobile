@@ -108,7 +108,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           FadePageRoute(child: const LoginScreen()),
-          (route) => false,
+              (route) => false,
         );
       }
     }
@@ -129,7 +129,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.fromLTRB(24, 60, 24, 40),
+              padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 24, 24, 40),
               decoration: const BoxDecoration(
                 color: Color(0xFF20C997),
                 borderRadius: BorderRadius.only(bottomLeft: Radius.circular(40), bottomRight: Radius.circular(40)),
@@ -145,15 +145,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: user.avatar != null
                           ? FluttermojiCircleAvatar(radius: 50)
                           : user.profilePictureUrl != null
-                              ? ClipOval(
-                                  child: Image.network(
-                                    user.profilePictureUrl!,
-                                    fit: BoxFit.cover,
-                                    width: 100,
-                                    height: 100,
-                                  ),
-                                )
-                              : const Icon(Icons.person, size: 50, color: Colors.white),
+                          ? ClipOval(
+                        child: Image.network(
+                          user.profilePictureUrl!,
+                          fit: BoxFit.cover,
+                          width: 100,
+                          height: 100,
+                        ),
+                      )
+                          : const Icon(Icons.person, size: 50, color: Colors.white),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -184,7 +184,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Navigator.push(context, FadePageRoute(child: const EmergencyContactsScreen()));
                   }),
                   _buildMenuItem('Change Password', 'images/lock-yellow.png', () {
-                     Navigator.push(context, FadePageRoute(child: const ChangePasswordScreen()));
+                    Navigator.push(context, FadePageRoute(child: const ChangePasswordScreen()));
                   }),
                   _buildMenuItem('Privacy Policy', 'images/document-green.png', () {}),
                   _buildMenuItem('Terms of Use', 'images/document-orange.png', () {}),

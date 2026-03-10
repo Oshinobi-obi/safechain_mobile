@@ -296,12 +296,12 @@ class _EnableBluetoothStepState extends State<EnableBluetoothStep> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             children: [
-              const Spacer(flex: 2),
-              SizedBox(height: 250, child: Center(child: RipplePulse(color: kPrimaryBlue, icon: Icons.bluetooth))),
+              const SizedBox(height: 32),
+              SizedBox(height: 220, child: Center(child: RipplePulse(color: kPrimaryBlue, icon: Icons.bluetooth))),
               const SizedBox(height: 8),
               const Text('Enable Bluetooth', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
@@ -316,7 +316,7 @@ class _EnableBluetoothStepState extends State<EnableBluetoothStep> {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.5),
               ),
-              const Spacer(flex: 3),
+              const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity, height: 56,
                 child: ElevatedButton(
@@ -371,7 +371,7 @@ class PairYourDeviceStep extends StatelessWidget {
         foregroundColor: Colors.black,
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             children: [
@@ -394,7 +394,7 @@ class PairYourDeviceStep extends StatelessWidget {
               _buildInstructionCard(2, 'Wait for LED', 'Device LED should start blinking.', Icons.flash_on),
               const SizedBox(height: 16),
               _buildInstructionCard(3, 'Scan QR Code', 'Point your camera at the QR code on the device.', Icons.qr_code),
-              const Spacer(),
+              const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity, height: 56,
                 child: ElevatedButton(
@@ -683,7 +683,7 @@ class SetUpDeviceStep extends StatelessWidget {
         elevation: 0,
       ),
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -723,7 +723,7 @@ class SetUpDeviceStep extends StatelessWidget {
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 ),
               ),
-              const Spacer(),
+              const SizedBox(height: 32),
               Row(
                 children: [
                   Expanded(
@@ -820,19 +820,19 @@ class AllSetStep extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(24.0),
           child: Column(
             children: [
-              const Spacer(),
-              SizedBox(height: 250, child: Center(child: RipplePulse(color: kPrimaryGreen, icon: Icons.check_rounded))),
+              const SizedBox(height: 32),
+              SizedBox(height: 220, child: Center(child: RipplePulse(color: kPrimaryGreen, icon: Icons.check_rounded))),
               const SizedBox(height: 8),
-              const Text('You\'re All Set! 🎉', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+              const Text('Youre All Set! 🎉', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               const Text('Your device is connected and ready', style: TextStyle(color: Colors.black87, fontSize: 15)),
               const SizedBox(height: 4),
               const Text('You can now test GPS location tracking', style: TextStyle(color: Colors.grey, fontSize: 13)),
-              const Spacer(),
+              const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity, height: 56,
                 child: ElevatedButton(
@@ -943,24 +943,24 @@ class ConnectionUnsuccessfulStep extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
-        child: Column(
-          children: [
-            const SizedBox(height: 20),
-            SizedBox(height: 250, child: Center(child: RipplePulse(color: const Color(0xFFFF5A5A), icon: Icons.signal_wifi_off_rounded))),
-            const Text('Connection Unsuccessful', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 12),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 40),
-              child: Text(
-                'Could not connect to the LoRa gateway. Please check your surroundings and try again.',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.6),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          child: Column(
+            children: [
+              const SizedBox(height: 20),
+              SizedBox(height: 250, child: Center(child: RipplePulse(color: const Color(0xFFFF5A5A), icon: Icons.signal_wifi_off_rounded))),
+              const Text('Connection Unsuccessful', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 12),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'Could not connect to the LoRa gateway. Please check your surroundings and try again.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.6),
+                ),
               ),
-            ),
-            const Spacer(),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: SizedBox(
+              const SizedBox(height: 48),
+              SizedBox(
                 width: double.infinity, height: 56,
                 child: ElevatedButton(
                   onPressed: onTryAgain,
@@ -971,14 +971,14 @@ class ConnectionUnsuccessfulStep extends StatelessWidget {
                   child: const Text('Try Again', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                 ),
               ),
-            ),
-            const SizedBox(height: 14),
-            TextButton(
-              onPressed: onViewMap,
-              child: const Text('View Gateway Map', style: TextStyle(color: Colors.grey)),
-            ),
-            const SizedBox(height: 30),
-          ],
+              const SizedBox(height: 14),
+              TextButton(
+                onPressed: onViewMap,
+                child: const Text('View Gateway Map', style: TextStyle(color: Colors.grey)),
+              ),
+              const SizedBox(height: 30),
+            ],
+          ),
         ),
       ),
     );
