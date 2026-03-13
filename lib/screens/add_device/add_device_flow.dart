@@ -389,11 +389,9 @@ class PairYourDeviceStep extends StatelessWidget {
                 style: TextStyle(color: Colors.grey, fontSize: 14),
               ),
               const SizedBox(height: 40),
-              _buildInstructionCard(1, 'Power On Device', 'Hold power button for 3 seconds.', Icons.power_settings_new),
+              _buildInstructionCard(1, 'Power On Device', 'Slide the power button to turn on the Deivcce.', Icons.power_settings_new),
               const SizedBox(height: 16),
-              _buildInstructionCard(2, 'Wait for LED', 'Device LED should start blinking.', Icons.flash_on),
-              const SizedBox(height: 16),
-              _buildInstructionCard(3, 'Scan QR Code', 'Point your camera at the QR code on the device.', Icons.qr_code),
+              _buildInstructionCard(2, 'Scan QR Code', 'Point your camera at the QR code on the device.', Icons.qr_code),
               const SizedBox(height: 40),
               SizedBox(
                 width: double.infinity, height: 56,

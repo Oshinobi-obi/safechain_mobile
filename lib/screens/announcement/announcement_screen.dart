@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:safechain/widgets/profile_completion_banner.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:safechain/services/session_manager.dart';
@@ -218,35 +219,42 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
           ),
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: kPrimaryGreen))
-          : _error != null
-          ? _buildError()
-          : _announcements.isEmpty
-          ? _buildEmpty()
-          : RefreshIndicator(
-        color: kPrimaryGreen,
-        onRefresh: () => _fetchAnnouncements(refresh: true),
-        child: ListView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-          itemCount: _announcements.length + (_isLoadingMore ? 1 : 0),
-          itemBuilder: (context, index) {
-            if (index == _announcements.length) {
-              return const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(child: CircularProgressIndicator(color: kPrimaryGreen)),
-              );
-            }
-            // Record view as soon as card is visible on screen
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              _recordView(_announcements[index]);
-            });
-            return _AnnouncementCard(
-              announcement: _announcements[index],
-            );
-          },
-        ),
+      body: Column(
+        children: [
+          const ProfileCompletionBanner(),
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator(color: kPrimaryGreen))
+                : _error != null
+                ? _buildError()
+                : _announcements.isEmpty
+                ? _buildEmpty()
+                : RefreshIndicator(
+              color: kPrimaryGreen,
+              onRefresh: () => _fetchAnnouncements(refresh: true),
+              child: ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                itemCount: _announcements.length + (_isLoadingMore ? 1 : 0),
+                itemBuilder: (context, index) {
+                  if (index == _announcements.length) {
+                    return const Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(child: CircularProgressIndicator(color: kPrimaryGreen)),
+                    );
+                  }
+                  // Record view as soon as card is visible on screen
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    _recordView(_announcements[index]);
+                  });
+                  return _AnnouncementCard(
+                    announcement: _announcements[index],
+                  );
+                },
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

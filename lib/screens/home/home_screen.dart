@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:safechain/screens/notification/notification_screen.dart';
 import 'package:safechain/services/notification_service.dart';
+import 'package:safechain/widgets/profile_completion_banner.dart';
 import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/screens/add_device/add_device_flow.dart';
 import 'package:safechain/screens/announcement/announcement_screen.dart';
@@ -430,6 +431,7 @@ class _DevicesContentState extends State<DevicesContent> {
 
           return CustomScrollView(
             slivers: [
+              const SliverToBoxAdapter(child: ProfileCompletionBanner()),
               SliverToBoxAdapter(
                 child: Stack(
                   children: [
@@ -617,12 +619,11 @@ class _DeviceCardState extends State<DeviceCard> {
     super.initState();
     _bleDevice = BluetoothDevice.fromId(widget.device.btRemoteId);
 
-    // Listen to the connection state of this specific device
     _connectionSubscription = _bleDevice.connectionState.listen((state) {
       if (mounted) {
         setState(() {
           _connectionState = state;
-          _isConnecting = false; // Stop loading spinner if state resolves
+          _isConnecting = false;
         });
       }
     });
@@ -663,7 +664,6 @@ class _DeviceCardState extends State<DeviceCard> {
         await _bleDevice.disconnect();
       }
     } else {
-      // If disconnected, try to connect immediately (no confirmation needed)
       setState(() => _isConnecting = true);
       try {
         await _bleDevice.connect(timeout: const Duration(seconds: 5));
@@ -683,7 +683,6 @@ class _DeviceCardState extends State<DeviceCard> {
 
   @override
   Widget build(BuildContext context) {
-    // Determine colors based on connection state
     final bool isConnected = _connectionState == BluetoothConnectionState.connected;
     final Color statusColor = _isConnecting
         ? Colors.orange
@@ -738,8 +737,6 @@ class _DeviceCardState extends State<DeviceCard> {
                               ),
                             ],
                           ),
-                          // ---------------------------------------
-
                         ],
                       ),
                     ),

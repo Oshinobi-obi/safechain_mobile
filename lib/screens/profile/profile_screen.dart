@@ -7,6 +7,7 @@ import 'package:safechain/screens/profile/personal_information_screen.dart';
 import 'package:safechain/screens/profile/emergency_contacts_screen.dart';
 import 'package:safechain/widgets/fade_page_route.dart';
 import 'package:fluttermoji/fluttermoji.dart';
+import 'package:safechain/widgets/profile_completion_banner.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -163,7 +164,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 8),
+            ProfileCompletionBanner(
+              user: user,
+              onCompleted: _loadUserData,
+            ),
+            const SizedBox(height: 16),
             _buildSectionHeader('General'),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
