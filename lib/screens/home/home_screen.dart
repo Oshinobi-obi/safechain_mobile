@@ -6,6 +6,7 @@ import 'package:safechain/services/notification_service.dart';
 import 'package:safechain/widgets/profile_completion_banner.dart';
 import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/screens/add_device/add_device_flow.dart';
+import 'package:safechain/modals/error_modal.dart';
 import 'package:safechain/screens/announcement/announcement_screen.dart';
 import 'package:safechain/screens/guide/guide_screen.dart';
 import 'package:safechain/screens/profile/profile_screen.dart';
@@ -431,7 +432,6 @@ class _DevicesContentState extends State<DevicesContent> {
 
           return CustomScrollView(
             slivers: [
-              const SliverToBoxAdapter(child: ProfileCompletionBanner()),
               SliverToBoxAdapter(
                 child: Stack(
                   children: [
@@ -539,8 +539,22 @@ class _DevicesContentState extends State<DevicesContent> {
                                 ),
                                 ElevatedButton.icon(
                                   onPressed: () async {
+                                    final user = _currentUser;
+                                    final incomplete = user == null ||
+                                        user.address.trim().isEmpty ||
+                                        user.contact.trim().isEmpty;
+                                    if (incomplete) {
+                                      showDialog(
+                                        context: context,
+                                        builder: (_) => const ErrorModal(
+                                          title: 'Profile Incomplete',
+                                          message: 'Please complete your profile details (address & contact) before adding a device.',
+                                        ),
+                                      );
+                                      return;
+                                    }
                                     await Navigator.push(context, FadePageRoute(child: const AddDeviceFlow()));
-                                    _refreshDevices(); // refresh after returning from add flow
+                                    _refreshDevices();
                                   },
                                   icon: const Icon(Icons.add, color: Color(0xFF20C997), size: 20),
                                   label: const Text('Add Device', style: TextStyle(color: Color(0xFF20C997), fontWeight: FontWeight.bold)),
@@ -555,6 +569,7 @@ class _DevicesContentState extends State<DevicesContent> {
                   ],
                 ),
               ),
+              const SliverToBoxAdapter(child: ProfileCompletionBanner()),
               if (snapshot.connectionState == ConnectionState.waiting)
                 const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(32.0), child: Center(child: CircularProgressIndicator(color: Color(0xFF20C997))))),
 

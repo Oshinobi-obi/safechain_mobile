@@ -73,23 +73,31 @@ class _SignupScreenState extends State<SignupScreen> {
       showDialog(
         context: context,
         builder: (context) {
-          return SliderCaptcha(
-            image: Image.asset(
-              'images/logo.png',
-              fit: BoxFit.fitWidth,
+          return Dialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SliderCaptcha(
+                image: Image.asset(
+                  'images/logo.png',
+                  height: 150,
+                  fit: BoxFit.contain,
+                ),
+                onConfirm: (value) async {
+                  Navigator.of(context).pop();
+                  if (value) {
+                    await _handleSignup();
+                  } else {
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('CAPTCHA verification failed.')),
+                      );
+                    }
+                  }
+                },
+              ),
             ),
-            onConfirm: (value) async {
-              Navigator.of(context).pop();
-              if (value) {
-                await _handleSignup();
-              } else {
-                if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('CAPTCHA verification failed.')),
-                  );
-                }
-              }
-            },
           );
         },
       );
@@ -168,7 +176,7 @@ class _SignupScreenState extends State<SignupScreen> {
     super.dispose();
   }
 
- @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF20C997),

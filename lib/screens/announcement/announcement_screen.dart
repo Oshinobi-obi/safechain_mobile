@@ -197,64 +197,64 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF1F5F9),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFFF1F5F9),
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: const Text(
-          'Announcements',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 24),
-        ),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(20),
-          child: Padding(
-            padding: const EdgeInsets.only(left: 16, bottom: 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Community safety updates and advisories.',
-                style: TextStyle(color: Colors.grey[600], fontSize: 14),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Banner sits above everything — shows only when profile is incomplete
+            const ProfileCompletionBanner(),
+            // Title section
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Announcements',
+                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 24),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Community safety updates and advisories.',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 14),
+                  ),
+                ],
               ),
             ),
-          ),
-        ),
-      ),
-      body: Column(
-        children: [
-          const ProfileCompletionBanner(),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: kPrimaryGreen))
-                : _error != null
-                ? _buildError()
-                : _announcements.isEmpty
-                ? _buildEmpty()
-                : RefreshIndicator(
-              color: kPrimaryGreen,
-              onRefresh: () => _fetchAnnouncements(refresh: true),
-              child: ListView.builder(
-                controller: _scrollController,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                itemCount: _announcements.length + (_isLoadingMore ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index == _announcements.length) {
-                    return const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Center(child: CircularProgressIndicator(color: kPrimaryGreen)),
+            Expanded(
+              child: _isLoading
+                  ? const Center(child: CircularProgressIndicator(color: kPrimaryGreen))
+                  : _error != null
+                  ? _buildError()
+                  : _announcements.isEmpty
+                  ? _buildEmpty()
+                  : RefreshIndicator(
+                color: kPrimaryGreen,
+                onRefresh: () => _fetchAnnouncements(refresh: true),
+                child: ListView.builder(
+                  controller: _scrollController,
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                  itemCount: _announcements.length + (_isLoadingMore ? 1 : 0),
+                  itemBuilder: (context, index) {
+                    if (index == _announcements.length) {
+                      return const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Center(child: CircularProgressIndicator(color: kPrimaryGreen)),
+                      );
+                    }
+                    // Record view as soon as card is visible on screen
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      _recordView(_announcements[index]);
+                    });
+                    return _AnnouncementCard(
+                      announcement: _announcements[index],
                     );
-                  }
-                  // Record view as soon as card is visible on screen
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    _recordView(_announcements[index]);
-                  });
-                  return _AnnouncementCard(
-                    announcement: _announcements[index],
-                  );
-                },
+                  },
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
