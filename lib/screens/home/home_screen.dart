@@ -47,6 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
   int _unreadNotifications = 0;
   Timer? _notifTimer;
   StreamSubscription<int>? _notifStream;
+  final List<AnimationController> _cardControllers = [];
+  final List<Animation<double>> _cardAnimations = [];
 
   @override
   void initState() {
@@ -66,6 +68,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _notifTimer?.cancel();
     _notifStream?.cancel();
+    for (final c in _cardControllers) { c.dispose(); }
     super.dispose();
   }
 
@@ -148,13 +151,15 @@ class DevicesContent extends StatefulWidget {
   State<DevicesContent> createState() => _DevicesContentState();
 }
 
-class _DevicesContentState extends State<DevicesContent> {
+class _DevicesContentState extends State<DevicesContent> with TickerProviderStateMixin {
   Future<List<Device>>? _devicesFuture;
   UserModel? _currentUser;
   int _unreadNotifications = 0;
 
   Timer? _notifTimer;
   StreamSubscription<int>? _notifStream;
+  final List<AnimationController> _cardControllers = [];
+  final List<Animation<double>> _cardAnimations = [];
 
   @override
   void initState() {
@@ -175,6 +180,7 @@ class _DevicesContentState extends State<DevicesContent> {
   void dispose() {
     _notifTimer?.cancel();
     _notifStream?.cancel();
+    for (final c in _cardControllers) { c.dispose(); }
     super.dispose();
   }
 
@@ -418,6 +424,26 @@ class _DevicesContentState extends State<DevicesContent> {
     );
   }
 
+  void _buildAnimatedControllers(int count) {
+    // Only rebuild if count changed
+    if (_cardControllers.length == count) return;
+    for (final c in _cardControllers) { c.dispose(); }
+    _cardControllers.clear();
+    _cardAnimations.clear();
+    for (int i = 0; i < count; i++) {
+      final controller = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 400),
+      );
+      _cardControllers.add(controller);
+      _cardAnimations.add(CurvedAnimation(parent: controller, curve: Curves.easeOut));
+      // Stagger: each card starts 80ms after the previous
+      Future.delayed(Duration(milliseconds: i * 80), () {
+        if (mounted) controller.forward();
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final String fullName = _currentUser?.name ?? 'User';
@@ -590,8 +616,24 @@ class _DevicesContentState extends State<DevicesContent> {
                   sliver: SliverList(
                     delegate: SliverChildBuilderDelegate(
                           (context, index) {
+                        _buildAnimatedControllers(devices.length);
                         final device = devices[index];
-                        return Padding(padding: const EdgeInsets.only(bottom: 16.0), child: _buildDeviceCard(context, device));
+                        final anim = index < _cardAnimations.length
+                            ? _cardAnimations[index]
+                            : const AlwaysStoppedAnimation(1.0);
+                        return FadeTransition(
+                          opacity: anim,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.18),
+                              end: Offset.zero,
+                            ).animate(anim as Animation<double>),
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 16.0),
+                              child: _buildDeviceCard(context, device),
+                            ),
+                          ),
+                        );
                       },
                       childCount: devices.length,
                     ),

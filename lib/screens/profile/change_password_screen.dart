@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:safechain/services/notification_service.dart';
 import 'package:safechain/services/session_manager.dart';
+import 'package:safechain/modals/error_modal.dart';
+import 'package:safechain/modals/success_modal.dart';
 
 class ChangePasswordScreen extends StatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -49,10 +51,11 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     if (p.isEmpty) {
       strength = 0;
     } else {
-      if (p.length >= 8) strength += 0.25;
-      if (_upperRegExp.hasMatch(p)) strength += 0.25;
-      if (_lowerRegExp.hasMatch(p)) strength += 0.25;
-      if (_numberRegExp.hasMatch(p)) strength += 0.25;
+      if (p.length >= 8) strength += 0.20;
+      if (_upperRegExp.hasMatch(p)) strength += 0.20;
+      if (_lowerRegExp.hasMatch(p)) strength += 0.20;
+      if (_numberRegExp.hasMatch(p)) strength += 0.20;
+      if (_specialRegExp.hasMatch(p)) strength += 0.20;
     }
     setState(() {
       _passwordStrength = strength;
@@ -72,7 +75,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
     final user = await SessionManager.getUser();
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('You are not logged in.')));
+      showDialog(
+        context: context,
+        builder: (_) => const ErrorModal(
+          title: 'Not Logged In',
+          message: 'Your session has expired. Please log in again.',
+        ),
+      );
       setState(() => _isLoading = false);
       return;
     }
@@ -95,22 +104,39 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(message),
-        backgroundColor: response.statusCode == 200 ? Colors.green : Colors.red,
-      ));
-
-      if (response.statusCode == 200) {
+      if (response.statusCode == 200 && responseBody['status'] == 'success') {
         await NotificationService.addNotification(
           'Security Alert',
           'Your password was changed successfully.',
           NotificationType.security,
         );
-        Navigator.pop(context);
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => SuccessModal(
+            title: 'Password Changed',
+            message: message,
+          ),
+        );
+        if (mounted) Navigator.pop(context);
+      } else {
+        showDialog(
+          context: context,
+          builder: (_) => ErrorModal(
+            title: 'Change Failed',
+            message: message,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('An unexpected error occurred: $e')));
+        showDialog(
+          context: context,
+          builder: (_) => const ErrorModal(
+            title: 'Unexpected Error',
+            message: 'Could not connect to the server. Please check your internet connection.',
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -147,6 +173,13 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
               const SizedBox(height: 24),
               _buildPasswordField('New Password', _newPasswordController, _obscureNewPassword, () {
                 setState(() => _obscureNewPassword = !_obscureNewPassword);
+              }, (value) {
+                if (value == null || value.isEmpty) return 'Please enter a new password';
+                if (value.length < 8) return 'Password must be at least 8 characters';
+                if (value == _currentPasswordController.text) {
+                  return 'New password must be different from your current password';
+                }
+                return null;
               }),
               const SizedBox(height: 8),
               Padding(
@@ -162,9 +195,10 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                 ),
               ),
               const SizedBox(height: 8),
+              _buildPasswordRequirement('At least 8 Characters', _newPasswordController.text.length >= 8),
               _buildPasswordRequirement('At least 1 Uppercase', _upperRegExp.hasMatch(_newPasswordController.text)),
               _buildPasswordRequirement('At least 1 Number', _numberRegExp.hasMatch(_newPasswordController.text)),
-              _buildPasswordRequirement('At least 8 Characters', _newPasswordController.text.length >= 8),
+              _buildPasswordRequirement('At least 1 Special Character', _specialRegExp.hasMatch(_newPasswordController.text)),
               const SizedBox(height: 24),
               _buildPasswordField('Confirm New Password', _confirmPasswordController, _obscureConfirmPassword, () {
                 setState(() => _obscureConfirmPassword = !_obscureConfirmPassword);

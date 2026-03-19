@@ -246,8 +246,11 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
                       _recordView(_announcements[index]);
                     });
-                    return _AnnouncementCard(
-                      announcement: _announcements[index],
+                    return _AnimatedCardWrapper(
+                      index: index,
+                      child: _AnnouncementCard(
+                        announcement: _announcements[index],
+                      ),
                     );
                   },
                 ),
@@ -292,6 +295,54 @@ class _AnnouncementScreenState extends State<AnnouncementScreen> {
       ],
     ),
   );
+}
+
+// ── Animated wrapper for staggered entrance ─────────────────────
+class _AnimatedCardWrapper extends StatefulWidget {
+  final int index;
+  final Widget child;
+  const _AnimatedCardWrapper({required this.index, required this.child});
+
+  @override
+  State<_AnimatedCardWrapper> createState() => _AnimatedCardWrapperState();
+}
+
+class _AnimatedCardWrapperState extends State<_AnimatedCardWrapper>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _fade;
+  late Animation<Offset> _slide;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+    _fade = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+    _slide = Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero)
+        .animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
+
+    // Stagger each card by 80ms
+    Future.delayed(Duration(milliseconds: widget.index * 80), () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fade,
+      child: SlideTransition(position: _slide, child: widget.child),
+    );
+  }
 }
 
 // ── Card ─────────────────────────────────────────────────────────

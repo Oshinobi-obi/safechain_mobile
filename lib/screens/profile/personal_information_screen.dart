@@ -6,6 +6,8 @@ import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/widgets/phone_number_formatter.dart';
+import 'package:safechain/modals/error_modal.dart';
+import 'package:safechain/modals/success_modal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:fluttermoji/fluttermoji.dart';
 
@@ -230,20 +232,36 @@ class _PersonalInformationScreenState
           final updatedUser = UserModel.fromJson(decodedBody['user']);
           await SessionManager.saveUser(updatedUser);
         }
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message), backgroundColor: Colors.green));
-        Navigator.pop(context);
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => SuccessModal(
+            title: 'Profile Updated',
+            message: message,
+          ),
+        );
+        if (mounted) Navigator.pop(context);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(message), backgroundColor: Colors.red));
+        showDialog(
+          context: context,
+          builder: (_) => ErrorModal(
+            title: 'Update Failed',
+            message: message,
+          ),
+        );
       }
     } catch (e) {
       if (mounted) {
         final errorMessage = e is FormatException
             ? 'Invalid server response.'
             : 'An unexpected error occurred: $e';
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(errorMessage)));
+        showDialog(
+          context: context,
+          builder: (_) => ErrorModal(
+            title: 'Unexpected Error',
+            message: errorMessage,
+          ),
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -261,52 +279,80 @@ class _PersonalInformationScreenState
       builder: (context) {
         return StatefulBuilder(
           builder: (BuildContext ctx, StateSetter setModalState) {
+            final keyboardHeight = MediaQuery.of(ctx).viewInsets.bottom;
+            final bottomPadding = MediaQuery.of(ctx).padding.bottom;
             return DraggableScrollableSheet(
               expand: false,
               initialChildSize: 0.65,
               maxChildSize: 0.9,
               minChildSize: 0.4,
               builder: (_, scrollController) {
-                return Container(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Center(
-                        child: Container(
-                          width: 40, height: 4,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(10),
+                return Padding(
+                  padding: EdgeInsets.only(bottom: keyboardHeight),
+                  child: Container(
+                    padding: EdgeInsets.fromLTRB(24, 20, 24, 24 + bottomPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 40, height: 4,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[300],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        'Choose all medical conditions that may affect rescue or treatment.',
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 16),
-                      Expanded(
-                        child: ListView(
-                          controller: scrollController,
-                          children: [
-                            // Standard conditions
-                            ..._medicalConditions.map((condition) {
-                              final isSelected = _selectedConditions.contains(condition);
-                              return CheckboxListTile(
-                                title: Text(condition),
-                                value: isSelected,
+                        const SizedBox(height: 20),
+                        const Text(
+                          'Choose all medical conditions that may affect rescue or treatment.',
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 16),
+                        Expanded(
+                          child: ListView(
+                            controller: scrollController,
+                            children: [
+                              // Standard conditions
+                              ..._medicalConditions.map((condition) {
+                                final isSelected = _selectedConditions.contains(condition);
+                                return CheckboxListTile(
+                                  title: Text(condition),
+                                  value: isSelected,
+                                  onChanged: (bool? value) {
+                                    setModalState(() {
+                                      setState(() {
+                                        if (value == true) {
+                                          // If selecting a standard condition while Others is active, deselect Others
+                                          if (!_selectedConditions.contains(condition)) {
+                                            _selectedConditions.add(condition);
+                                          }
+                                        } else {
+                                          _selectedConditions.remove(condition);
+                                        }
+                                      });
+                                    });
+                                  },
+                                  activeColor: _kGreen,
+                                  controlAffinity: ListTileControlAffinity.leading,
+                                  checkboxShape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(4)),
+                                );
+                              }),
+
+                              // "Others" option
+                              CheckboxListTile(
+                                title: const Text('Others'),
+                                value: _hasOthers,
                                 onChanged: (bool? value) {
                                   setModalState(() {
                                     setState(() {
-                                      if (value == true) {
-                                        // If selecting a standard condition while Others is active, deselect Others
-                                        if (!_selectedConditions.contains(condition)) {
-                                          _selectedConditions.add(condition);
-                                        }
+                                      _hasOthers = value ?? false;
+                                      if (_hasOthers) {
+                                        // Uncheck all other conditions
+                                        _selectedConditions.clear();
                                       } else {
-                                        _selectedConditions.remove(condition);
+                                        _othersController.clear();
                                       }
                                     });
                                   });
@@ -315,76 +361,63 @@ class _PersonalInformationScreenState
                                 controlAffinity: ListTileControlAffinity.leading,
                                 checkboxShape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(4)),
-                              );
-                            }),
-
-                            // "Others" option
-                            CheckboxListTile(
-                              title: const Text('Others'),
-                              value: _hasOthers,
-                              onChanged: (bool? value) {
-                                setModalState(() {
-                                  setState(() {
-                                    _hasOthers = value ?? false;
-                                    if (_hasOthers) {
-                                      // Uncheck all other conditions
-                                      _selectedConditions.clear();
-                                    } else {
-                                      _othersController.clear();
-                                    }
-                                  });
-                                });
-                              },
-                              activeColor: _kGreen,
-                              controlAffinity: ListTileControlAffinity.leading,
-                              checkboxShape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(4)),
-                            ),
-
-                            // Textbox for Others
-                            if (_hasOthers)
-                              Padding(
-                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                                child: TextField(
-                                  controller: _othersController,
-                                  autofocus: true,
-                                  decoration: InputDecoration(
-                                    hintText: 'Describe your condition...',
-                                    fillColor: _kBg,
-                                    filled: true,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(14),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                        horizontal: 16, vertical: 14),
-                                  ),
-                                  onChanged: (_) => setModalState(() {}),
-                                ),
                               ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: _kGreen,
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(16)),
-                            elevation: 0,
+
+                              // Textbox for Others
+                              if (_hasOthers)
+                                Padding(
+                                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+                                  child: TextField(
+                                    controller: _othersController,
+                                    autofocus: true,
+                                    onTap: () {
+                                      // Scroll down so the field is visible above keyboard
+                                      Future.delayed(const Duration(milliseconds: 300), () {
+                                        scrollController.animateTo(
+                                          scrollController.position.maxScrollExtent,
+                                          duration: const Duration(milliseconds: 300),
+                                          curve: Curves.easeOut,
+                                        );
+                                      });
+                                    },
+                                    decoration: InputDecoration(
+                                      hintText: 'Describe your condition...',
+                                      fillColor: _kBg,
+                                      filled: true,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 16, vertical: 14),
+                                    ),
+                                    onChanged: (_) => setModalState(() {}),
+                                  ),
+                                ),
+                            ],
                           ),
-                          child: const Text('Done',
-                              style: TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16)),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => Navigator.pop(context),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _kGreen,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(16)),
+                              elevation: 0,
+                            ),
+                            child: const Text('Done',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16)),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               },

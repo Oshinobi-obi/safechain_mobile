@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:safechain/modals/success_modal.dart';
+import 'package:safechain/modals/error_modal.dart';
 import 'package:safechain/screens/login/login_screen.dart';
 import 'package:safechain/widgets/fade_page_route.dart';
 import 'package:slider_captcha/slider_captcha.dart';
@@ -90,8 +91,12 @@ class _SignupScreenState extends State<SignupScreen> {
                     await _handleSignup();
                   } else {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('CAPTCHA verification failed.')),
+                      showDialog(
+                        context: context,
+                        builder: (_) => const ErrorModal(
+                          title: 'Verification Failed',
+                          message: 'CAPTCHA verification failed. Please try again.',
+                        ),
                       );
                     }
                   }
@@ -148,15 +153,23 @@ class _SignupScreenState extends State<SignupScreen> {
           _emailErrorText = message;
         });
       } else {
-        // Handle all other errors with a SnackBar
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
+        // Handle all other errors with ErrorModal
+        showDialog(
+          context: context,
+          builder: (_) => ErrorModal(
+            title: 'Registration Failed',
+            message: message,
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('An unexpected error occurred: $e')),
+        showDialog(
+          context: context,
+          builder: (_) => const ErrorModal(
+            title: 'Unexpected Error',
+            message: 'Could not connect to the server. Please check your internet connection.',
+          ),
         );
       }
     }
@@ -174,6 +187,263 @@ class _SignupScreenState extends State<SignupScreen> {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  // ── Show Terms & Policy modal ────────────────────────────────
+  Future<void> _showTermsModal() async {
+    final ScrollController scrollController = ScrollController();
+    bool hasScrolledToBottom = false;
+    bool hasStartedScrolling = false;
+
+    final accepted = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            scrollController.addListener(() {
+              if (!hasStartedScrolling && scrollController.offset > 10) {
+                setModalState(() => hasStartedScrolling = true);
+              }
+              if (!hasScrolledToBottom &&
+                  scrollController.offset >=
+                      scrollController.position.maxScrollExtent - 40) {
+                setModalState(() => hasScrolledToBottom = true);
+              }
+            });
+
+            return Dialog(
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20)),
+              insetPadding: const EdgeInsets.symmetric(
+                  horizontal: 20, vertical: 40),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Header
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 16, 16),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF20C997),
+                      borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(20)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.article_rounded,
+                            color: Colors.white, size: 22),
+                        const SizedBox(width: 10),
+                        const Expanded(
+                          child: Text(
+                            'Terms & Privacy Policy',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.close, color: Colors.white),
+                          onPressed: () => Navigator.of(context).pop(false),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  // Scroll hint — hidden once user starts scrolling
+                  if (!hasStartedScrolling)
+                    Container(
+                      color: const Color(0xFFFFFBEB),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      child: Row(
+                        children: const [
+                          Icon(Icons.swipe_down_rounded,
+                              color: Color(0xFFD97706), size: 16),
+                          SizedBox(width: 6),
+                          Text(
+                            'Please scroll to the bottom to accept.',
+                            style: TextStyle(
+                                color: Color(0xFF92400E), fontSize: 12),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                  // Scrollable content
+                  Flexible(
+                    child: Scrollbar(
+                      controller: scrollController,
+                      thumbVisibility: true,
+                      child: SingleChildScrollView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text('Last updated: January 2025',
+                                style: TextStyle(
+                                    color: Colors.grey, fontSize: 12)),
+                            SizedBox(height: 16),
+
+                            // Terms of Use
+                            Text('Terms of Use',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF20C997))),
+                            SizedBox(height: 8),
+                            Text('1. Acceptance of Terms',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            SizedBox(height: 4),
+                            Text(
+                              'By creating an account and using SafeChain, you agree to be bound by these Terms of Use. The app is intended for registered residents and authorized users only.',
+                              style: TextStyle(height: 1.5, color: Colors.black87),
+                            ),
+                            SizedBox(height: 12),
+                            Text('2. Responsible Use',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            SizedBox(height: 4),
+                            Text(
+                              'You agree to use SafeChain solely for its intended emergency response and device management purposes. False emergency alerts are strictly prohibited and may result in account suspension and coordination with local authorities.',
+                              style: TextStyle(height: 1.5, color: Colors.black87),
+                            ),
+                            SizedBox(height: 12),
+                            Text('3. Account Responsibility',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            SizedBox(height: 4),
+                            Text(
+                              'You are responsible for maintaining the confidentiality of your account credentials. You must notify us immediately if you suspect unauthorized access to your account.',
+                              style: TextStyle(height: 1.5, color: Colors.black87),
+                            ),
+                            SizedBox(height: 12),
+                            Text('4. Device Registration',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            SizedBox(height: 4),
+                            Text(
+                              'Each SafeChain device may only be registered to one resident account at a time. Transferring or sharing device access without authorization is prohibited.',
+                              style: TextStyle(height: 1.5, color: Colors.black87),
+                            ),
+                            SizedBox(height: 12),
+                            Text('5. Limitation of Liability',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            SizedBox(height: 4),
+                            Text(
+                              'SafeChain is a tool to assist in emergencies. Response times depend on network connectivity and responder availability. We are not liable for delays or failures outside our reasonable control.',
+                              style: TextStyle(height: 1.5, color: Colors.black87),
+                            ),
+
+                            SizedBox(height: 24),
+                            Divider(),
+                            SizedBox(height: 16),
+
+                            // Privacy Policy
+                            Text('Privacy Policy',
+                                style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF20C997))),
+                            SizedBox(height: 8),
+                            Text('1. Data We Collect',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            SizedBox(height: 4),
+                            Text(
+                              'We collect your full name, email address, contact number, home address, and device information. We may also collect GPS location data from your registered SafeChain device during active tracking sessions.',
+                              style: TextStyle(height: 1.5, color: Colors.black87),
+                            ),
+                            SizedBox(height: 12),
+                            Text('2. How We Use Your Data',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            SizedBox(height: 4),
+                            Text(
+                              'Your data is used exclusively to provide SafeChain services including emergency alerts, GPS tracking, and device management. We do not sell or share your personal information with third parties.',
+                              style: TextStyle(height: 1.5, color: Colors.black87),
+                            ),
+                            SizedBox(height: 12),
+                            Text('3. Data Security',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            SizedBox(height: 4),
+                            Text(
+                              'All data is transmitted over HTTPS encryption. We implement industry-standard security measures to protect your information from unauthorized access or disclosure.',
+                              style: TextStyle(height: 1.5, color: Colors.black87),
+                            ),
+                            SizedBox(height: 12),
+                            Text('4. Data Retention',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            SizedBox(height: 4),
+                            Text(
+                              'We retain your data for as long as your account is active. You may request deletion of your account and all associated data at any time by contacting support.',
+                              style: TextStyle(height: 1.5, color: Colors.black87),
+                            ),
+                            SizedBox(height: 12),
+                            Text('5. Your Rights',
+                                style: TextStyle(fontWeight: FontWeight.w600)),
+                            SizedBox(height: 4),
+                            Text(
+                              'You have the right to access, correct, or delete your personal data. You may also withdraw consent at any time, though this may affect your ability to use certain features of the app.',
+                              style: TextStyle(height: 1.5, color: Colors.black87),
+                            ),
+                            SizedBox(height: 24),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Accept button — full width, enabled only after scrolling to bottom
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: const BorderRadius.vertical(
+                          bottom: Radius.circular(20)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.06),
+                          blurRadius: 8,
+                          offset: const Offset(0, -3),
+                        ),
+                      ],
+                    ),
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: hasScrolledToBottom
+                            ? () => Navigator.of(context).pop(true)
+                            : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF20C997),
+                          disabledBackgroundColor: Colors.grey.shade300,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
+                        ),
+                        child: Text(
+                          hasScrolledToBottom ? 'Accept' : 'Scroll to Accept',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: hasScrolledToBottom
+                                ? Colors.white
+                                : Colors.grey.shade500,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+
+    if (accepted == true) {
+      setState(() => _agreedToTerms = true);
+    }
   }
 
   @override
@@ -371,9 +641,12 @@ class _SignupScreenState extends State<SignupScreen> {
                                       Checkbox(
                                         value: _agreedToTerms,
                                         onChanged: (value) {
-                                          setState(() {
-                                            _agreedToTerms = value ?? false;
-                                          });
+                                          if (value == true) {
+                                            // Show modal — only check if user accepts
+                                            _showTermsModal();
+                                          } else {
+                                            setState(() => _agreedToTerms = false);
+                                          }
                                         },
                                         activeColor: const Color(0xFF20C997),
                                         checkColor: Colors.white,
@@ -381,20 +654,23 @@ class _SignupScreenState extends State<SignupScreen> {
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                                       ),
                                       Expanded(
-                                        child: Text.rich(
-                                          TextSpan(
-                                            text: 'I agree to Safechain\'s ',
-                                            children: [
-                                              TextSpan(
-                                                text: 'Terms',
-                                                style: TextStyle(color: Color(0xFF20C997), fontWeight: FontWeight.bold),
-                                              ),
-                                              TextSpan(text: ' and '),
-                                              TextSpan(
-                                                text: 'Policy',
-                                                style: TextStyle(color: Color(0xFF20C997), fontWeight: FontWeight.bold),
-                                              ),
-                                            ],
+                                        child: GestureDetector(
+                                          onTap: _showTermsModal,
+                                          child: Text.rich(
+                                            TextSpan(
+                                              text: 'I agree to Safechain\'s ',
+                                              children: [
+                                                TextSpan(
+                                                  text: 'Terms',
+                                                  style: TextStyle(color: Color(0xFF20C997), fontWeight: FontWeight.bold),
+                                                ),
+                                                TextSpan(text: ' and '),
+                                                TextSpan(
+                                                  text: 'Privacy Policy',
+                                                  style: TextStyle(color: Color(0xFF20C997), fontWeight: FontWeight.bold),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),

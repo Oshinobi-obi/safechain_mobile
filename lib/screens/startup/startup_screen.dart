@@ -93,7 +93,8 @@ class _StartupScreenState extends State<StartupScreen> with SingleTickerProvider
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
+                      color: Colors.white,
+                      letterSpacing: 2,
                     ),
                   ),
                   RichText(
@@ -107,7 +108,7 @@ class _StartupScreenState extends State<StartupScreen> with SingleTickerProvider
                             text: 'SAFE',
                             style: TextStyle(color: Color(0xFF20C997))),
                         TextSpan(
-                            text: 'CHAIN', style: TextStyle(color: Colors.black)),
+                            text: 'CHAIN', style: TextStyle(color: Colors.white)),
                       ],
                     ),
                   ),

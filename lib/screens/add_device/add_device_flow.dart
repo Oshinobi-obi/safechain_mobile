@@ -9,6 +9,7 @@ import 'package:safechain/services/notification_service.dart';
 import 'package:safechain/services/session_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:safechain/screens/tracking/device_tracking_screen.dart';
 import 'package:safechain/screens/home/home_screen.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -168,7 +169,19 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
       TestingGatewayStep(onSuccess: () => _goToStep(6), onError: () => _goToStep(8)),
       // 6. Success Summary
       AllSetStep(
-        onTestGps: () => _goToStep(7),
+        onTestGps: () {
+          if (_scannedBtRemoteId != null) {
+            Navigator.push(
+              context,
+              FadePageRoute(
+                child: DeviceTrackingScreen(
+                  deviceId: _scannedBtRemoteId!,
+                  deviceName: _deviceName,
+                ),
+              ),
+            );
+          }
+        },
         onGoToDeviceList: () => Navigator.pushReplacement(context, FadePageRoute(child: const HomeScreen())),
       ),
       // 7. Location Testing

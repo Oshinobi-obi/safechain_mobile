@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:safechain/modals/success_modal.dart';
+import 'package:safechain/modals/error_modal.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:slider_captcha/slider_captcha.dart';
 
@@ -39,8 +40,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     await _handlePasswordReset();
                   } else {
                     if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('CAPTCHA verification failed.')),
+                      showDialog(
+                        context: context,
+                        builder: (_) => const ErrorModal(
+                          title: 'Verification Failed',
+                          message: 'CAPTCHA verification failed. Please try again.',
+                        ),
                       );
                     }
                   }
@@ -70,23 +75,35 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       final message = responseBody['message'] ?? 'An error occurred.';
 
       if (!mounted) return;
-      await showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => SuccessModal(
-          title: 'Request Sent',
-          message: message,
-        ),
-      );
 
-      if (mounted) {
-        Navigator.of(context).pop();
+      if (response.statusCode == 200) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => SuccessModal(
+            title: 'Request Sent',
+            message: message,
+          ),
+        );
+        if (mounted) Navigator.of(context).pop();
+      } else {
+        showDialog(
+          context: context,
+          builder: (_) => ErrorModal(
+            title: 'Request Failed',
+            message: message,
+          ),
+        );
       }
 
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('An unexpected error occurred: $e')),
+        showDialog(
+          context: context,
+          builder: (_) => const ErrorModal(
+            title: 'Unexpected Error',
+            message: 'Could not connect to the server. Please check your internet connection.',
+          ),
         );
       }
     } finally {

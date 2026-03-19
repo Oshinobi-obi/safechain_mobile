@@ -61,7 +61,7 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
     setState(() {
       _filteredContacts = _allContacts.where((contact) {
         return contact['name'].toLowerCase().contains(query) ||
-               contact['contact_number'].contains(query);
+            contact['contact_number'].contains(query);
       }).toList();
     });
   }
@@ -147,33 +147,33 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
           icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: () => Navigator.pop(context),
         ),
-        title: _isSearching 
+        title: _isSearching
             ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: const InputDecoration(
-                  hintText: 'Search contacts...',
-                  border: InputBorder.none,
-                ),
-              )
+          controller: _searchController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: 'Search contacts...',
+            border: InputBorder.none,
+          ),
+        )
             : const Text(
-                'Emergency Contacts',
-                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-              ),
+          'Emergency Contacts',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         actions: [
           _isSearching
-            ? IconButton(
-                icon: const Icon(Icons.close, color: Colors.black54),
-                onPressed: () => setState(() {
-                  _isSearching = false;
-                  _searchController.clear();
-                }),
-              )
-            : IconButton(
-                icon: Image.asset('images/search-icon.png', width: 24, color: Colors.black54),
-                onPressed: () => setState(() => _isSearching = true),
-              ),
+              ? IconButton(
+            icon: const Icon(Icons.close, color: Colors.black54),
+            onPressed: () => setState(() {
+              _isSearching = false;
+              _searchController.clear();
+            }),
+          )
+              : IconButton(
+            icon: Image.asset('images/search-icon.png', width: 24, color: Colors.black54),
+            onPressed: () => setState(() => _isSearching = true),
+          ),
         ],
         backgroundColor: Colors.white,
         elevation: 0,
@@ -181,44 +181,60 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Color(0xFF20C997)))
           : _filteredContacts.isEmpty
-              ? Center(
-                  child: Text(
-                    _allContacts.isEmpty ? 'No emergency contacts added yet.' : 'No contacts found.',
-                    style: const TextStyle(color: Colors.grey, fontSize: 16)
-                  ),
-                )
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  itemCount: _filteredContacts.length,
-                  itemBuilder: (context, index) {
-                    final contact = _filteredContacts[index];
-                    return ListTile(
-                      leading: CircleAvatar(
-                        radius: 28,
-                        backgroundColor: _getColorForContact(contact['name']),
-                        child: Text(
-                          getInitials(contact['name']),
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                      title: Text(
-                        contact['name']!,
-                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                      ),
-                      subtitle: Text(
-                        contact['contact_number']!,
-                        style: const TextStyle(color: Colors.grey),
-                      ),
-                      trailing: Builder(
-                        builder: (context) => IconButton(
-                          icon: const Icon(Icons.more_vert, color: Colors.black54),
-                          onPressed: () => _showContactOptions(context, contact),
-                        ),
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-                    );
-                  },
+          ? Center(
+        child: Text(
+            _allContacts.isEmpty ? 'No emergency contacts added yet.' : 'No contacts found.',
+            style: const TextStyle(color: Colors.grey, fontSize: 16)
+        ),
+      )
+          : ListView.builder(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        itemCount: _filteredContacts.length,
+        itemBuilder: (context, index) {
+          final contact = _filteredContacts[index];
+          return ListTile(
+            leading: CircleAvatar(
+              radius: 28,
+              backgroundColor: _getColorForContact(contact['name']),
+              child: Text(
+                getInitials(contact['name']),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+            title: Text(
+              contact['name']!,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  contact['contact_number']!,
+                  style: const TextStyle(color: Colors.grey),
                 ),
+                if (contact['relationship'] != null &&
+                    contact['relationship'].toString().isNotEmpty &&
+                    contact['relationship'].toString() != 'None / Prefer not to say')
+                  Text(
+                    contact['relationship'].toString(),
+                    style: const TextStyle(
+                      color: Color(0xFF20C997),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
+            ),
+            trailing: Builder(
+              builder: (context) => IconButton(
+                icon: const Icon(Icons.more_vert, color: Colors.black54),
+                onPressed: () => _showContactOptions(context, contact),
+              ),
+            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+          );
+        },
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showAddContactSheet(),
         backgroundColor: const Color(0xFF20C997),
@@ -271,9 +287,9 @@ class _AddContactSheetState extends State<_AddContactSheet> {
       return;
     }
 
-    final url = isUpdating 
-      ? 'https://safechain.site/api/mobile/update_contact.php'
-      : 'https://safechain.site/api/mobile/add_contact.php';
+    final url = isUpdating
+        ? 'https://safechain.site/api/mobile/update_contact.php'
+        : 'https://safechain.site/api/mobile/add_contact.php';
 
     final body = {
       'resident_id': user.residentId,
@@ -281,7 +297,7 @@ class _AddContactSheetState extends State<_AddContactSheet> {
       'contact_number': _contactController.text,
       'relationship': _selectedRelationship,
     };
-    
+
     if(isUpdating) {
       body['contact_id'] = widget.contact!['contact_id'];
     }
@@ -292,7 +308,7 @@ class _AddContactSheetState extends State<_AddContactSheet> {
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body: jsonEncode(body),
       );
-      
+
       if(response.statusCode == 200 || response.statusCode == 201) {
         widget.onSave();
         Navigator.pop(context);
@@ -308,9 +324,9 @@ class _AddContactSheetState extends State<_AddContactSheet> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: MediaQuery.of(context).viewInsets,
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).padding.bottom),
         child: Form(
           key: _formKey,
           child: Column(

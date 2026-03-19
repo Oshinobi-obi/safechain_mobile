@@ -16,16 +16,29 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
   UserModel? _currentUser;
   bool _isLoading = true;
   bool _notificationsEnabled = false;
+
+  late AnimationController _headerController;
+  late Animation<double> _headerFade;
+  late Animation<Offset> _headerSlide;
 
   @override
   void initState() {
     super.initState();
     _checkNotificationPermission();
     _loadUserData();
+    _headerController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 550),
+    );
+    _headerFade = CurvedAnimation(parent: _headerController, curve: Curves.easeOut);
+    _headerSlide = Tween<Offset>(
+      begin: const Offset(0, -0.12),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(parent: _headerController, curve: Curves.easeOut));
   }
 
   Future<void> _loadUserData() async {
@@ -36,6 +49,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _currentUser = user;
         _isLoading = false;
       });
+      _headerController.forward(from: 0);
     }
   }
 
@@ -116,6 +130,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   @override
+  void dispose() {
+    _headerController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     if (_isLoading || _currentUser == null) {
       return const Center(child: CircularProgressIndicator());
@@ -128,40 +148,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
       child: SingleChildScrollView(
         child: Column(
           children: [
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 24, 24, 40),
-              decoration: const BoxDecoration(
-                color: Color(0xFF20C997),
-                borderRadius: BorderRadius.only(bottomLeft: Radius.circular(40), bottomRight: Radius.circular(40)),
-              ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3)),
-                    child: CircleAvatar(
-                      radius: 50,
-                      backgroundColor: Colors.white30,
-                      child: user.avatar != null
-                          ? FluttermojiCircleAvatar(radius: 50)
-                          : user.profilePictureUrl != null
-                          ? ClipOval(
-                        child: Image.network(
-                          user.profilePictureUrl!,
-                          fit: BoxFit.cover,
-                          width: 100,
-                          height: 100,
-                        ),
-                      )
-                          : const Icon(Icons.person, size: 50, color: Colors.white),
-                    ),
+            FadeTransition(
+              opacity: _headerFade,
+              child: SlideTransition(
+                position: _headerSlide,
+                child: Container(
+                  width: double.infinity,
+                  padding: EdgeInsets.fromLTRB(24, MediaQuery.of(context).padding.top + 24, 24, 40),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF20C997),
+                    borderRadius: BorderRadius.only(bottomLeft: Radius.circular(40), bottomRight: Radius.circular(40)),
                   ),
-                  const SizedBox(height: 16),
-                  Text(user.name, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 4),
-                  Text('User ID: ${user.residentId}', style: const TextStyle(color: Colors.white70, fontSize: 14)),
-                ],
+                  child: Column(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(shape: BoxShape.circle, border: Border.all(color: Colors.white, width: 3)),
+                        child: CircleAvatar(
+                          radius: 50,
+                          backgroundColor: Colors.white30,
+                          child: user.avatar != null
+                              ? FluttermojiCircleAvatar(radius: 50)
+                              : user.profilePictureUrl != null
+                              ? ClipOval(
+                            child: Image.network(
+                              user.profilePictureUrl!,
+                              fit: BoxFit.cover,
+                              width: 100,
+                              height: 100,
+                            ),
+                          )
+                              : const Icon(Icons.person, size: 50, color: Colors.white),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(user.name, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 4),
+                      Text('User ID: ${user.residentId}', style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                    ],
+                  ),
+                ),
               ),
             ),
             const SizedBox(height: 8),
@@ -192,8 +218,78 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   _buildMenuItem('Change Password', 'images/lock-yellow.png', () {
                     Navigator.push(context, FadePageRoute(child: const ChangePasswordScreen()));
                   }),
-                  _buildMenuItem('Privacy Policy', 'images/document-green.png', () {}),
-                  _buildMenuItem('Terms of Use', 'images/document-orange.png', () {}),
+                  _buildMenuItem('Privacy Policy', 'images/document-green.png', () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        title: const Text('Privacy Policy', style: TextStyle(fontWeight: FontWeight.bold)),
+                        content: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Text('Last updated: January 2025', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                              SizedBox(height: 12),
+                              Text('Data Collection', style: TextStyle(fontWeight: FontWeight.bold)),
+                              SizedBox(height: 4),
+                              Text('SafeChain collects your name, contact number, address, and device information solely for the purpose of emergency response and device management.'),
+                              SizedBox(height: 12),
+                              Text('Data Usage', style: TextStyle(fontWeight: FontWeight.bold)),
+                              SizedBox(height: 4),
+                              Text('Your data is never sold to third parties. It is used only to provide SafeChain services including emergency alerts and GPS tracking.'),
+                              SizedBox(height: 12),
+                              Text('Data Security', style: TextStyle(fontWeight: FontWeight.bold)),
+                              SizedBox(height: 4),
+                              Text('All data is transmitted over HTTPS and stored securely. You may request deletion of your account and data at any time.'),
+                            ],
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Close', style: TextStyle(color: Color(0xFF20C997), fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
+                  _buildMenuItem('Terms of Use', 'images/document-orange.png', () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        title: const Text('Terms of Use', style: TextStyle(fontWeight: FontWeight.bold)),
+                        content: SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Text('Last updated: January 2025', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                              SizedBox(height: 12),
+                              Text('Acceptance', style: TextStyle(fontWeight: FontWeight.bold)),
+                              SizedBox(height: 4),
+                              Text('By using SafeChain, you agree to these terms. The app is intended for registered residents and authorized users only.'),
+                              SizedBox(height: 12),
+                              Text('Responsible Use', style: TextStyle(fontWeight: FontWeight.bold)),
+                              SizedBox(height: 4),
+                              Text('False emergency alerts are prohibited. Misuse of the SOS feature may result in account suspension and coordination with local authorities.'),
+                              SizedBox(height: 12),
+                              Text('Liability', style: TextStyle(fontWeight: FontWeight.bold)),
+                              SizedBox(height: 4),
+                              Text('SafeChain is a tool to assist in emergencies. Response times depend on network connectivity and responder availability. We are not liable for delays outside our control.'),
+                            ],
+                          ),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(),
+                            child: const Text('Close', style: TextStyle(color: Color(0xFF20C997), fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
+                    );
+                  }),
                   _buildSwitchItem('Notifications', 'images/bell-purple.png'),
                 ],
               ),

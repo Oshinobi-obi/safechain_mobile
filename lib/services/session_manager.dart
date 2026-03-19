@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class UserModel {
@@ -37,7 +38,7 @@ class UserModel {
             conditions = List<String>.from(decoded.map((e) => e.toString()));
           }
         } catch (e) {
-          print('Error parsing medical_conditions: $e');
+          debugPrint('Error parsing medical_conditions: $e');
         }
       }
     }
