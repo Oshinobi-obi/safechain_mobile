@@ -15,6 +15,7 @@ $resident_id = $data['resident_id'] ?? null;
 $name = $data['name'] ?? null;
 $contact_number = $data['contact_number'] ?? null;
 $relationship = $data['relationship'] ?? null;
+$email = $data['email'] ?? null;
 
 if (!$resident_id || !$name || !$contact_number) {
     http_response_code(400);
@@ -23,8 +24,8 @@ if (!$resident_id || !$name || !$contact_number) {
 }
 
 try {
-    $stmt = $conn->prepare("INSERT INTO emergency_contacts (resident_id, name, contact_number, relationship) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("ssss", $resident_id, $name, $contact_number, $relationship);
+    $stmt = $conn->prepare("INSERT INTO emergency_contacts (resident_id, name, contact_number, relationship, email) VALUES (?, ?, ?, ?, ?)");
+    $stmt->bind_param("sssss", $resident_id, $name, $contact_number, $relationship, $email);
 
     if ($stmt->execute()) {
         http_response_code(201);

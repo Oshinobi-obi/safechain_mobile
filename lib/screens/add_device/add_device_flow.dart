@@ -43,8 +43,8 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
   void _goToStep(int step) => setState(() => _currentIndex = step);
 
   Future<void> _addDevice() async {
+    // ── 1. Session check ─────────────────────────────────────────
     final user = await SessionManager.getUser();
-
     if (user == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -54,7 +54,8 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
       return;
     }
 
-    if (_scannedBtRemoteId == null) {
+    // ── 2. Scanned device guard ───────────────────────────────────
+    if (_scannedBtRemoteId == null || _scannedBtRemoteId!.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No device scanned. Please scan the QR code first.'), backgroundColor: Colors.red),
@@ -63,8 +64,31 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
       return;
     }
 
+    // ── 3. Device name validation ─────────────────────────────────
+    final trimmedName = _deviceName.trim();
+    if (trimmedName.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Device name cannot be empty.'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+    if (trimmedName.length > 50) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Device name must be 50 characters or fewer.'), backgroundColor: Colors.red),
+        );
+      }
+      return;
+    }
+
     final String btRemoteId = _scannedBtRemoteId!;
 
+    // ── 4. Cloud ownership check (bt_remote_id vs resident_id) ───
+    // Ensures this MAC address isn't already registered to ANY resident.
+    // Backend checks the devices table: if bt_remote_id exists with a
+    // different resident_id → 'taken'; same resident_id → 'owned'.
     try {
       final checkResponse = await http.get(
         Uri.parse('https://safechain.site/api/mobile/check_device.php?bt_remote_id=$btRemoteId&resident_id=${user.residentId}'),
@@ -102,18 +126,34 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
           }
           return;
         }
+      } else {
+        // Server returned unexpected status — block registration
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Could not verify device ownership. Please try again.'), backgroundColor: Colors.orange),
+          );
+        }
+        return;
       }
     } catch (e) {
+      // Network error during ownership check — block registration, don't proceed blindly
       debugPrint('Device check error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Network error. Please check your connection and try again.'), backgroundColor: Colors.red),
+        );
+      }
+      return;
     }
 
+    // ── 5. Cloud registration ─────────────────────────────────────
     try {
       final response = await http.post(
         Uri.parse('https://safechain.site/api/mobile/add_device.php'),
         headers: {'Content-Type': 'application/json; charset=UTF-8'},
         body: jsonEncode(<String, String>{
           'resident_id': user.residentId,
-          'name': _deviceName,
+          'name': trimmedName,
           'bt_remote_id': btRemoteId,
         }),
       );
@@ -121,13 +161,29 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
       if (response.statusCode == 201) {
         await NotificationService.addNotification(
           'New Device Added',
-          'Successfully added $_deviceName to your account.',
+          'Successfully added $trimmedName to your account.',
           NotificationType.device,
         );
+        _nextStep(); // Moves to TestingGatewayStep only on success
+      } else {
+        // API returned a non-201 — show error, do not advance
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to register device (server error ${response.statusCode}). Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
-      _nextStep(); // Moves to TestingGatewayStep
     } catch (e) {
-      _nextStep();
+      // Network failure during registration — do NOT silently advance
+      debugPrint('Add device error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Network error during registration. Please try again.'), backgroundColor: Colors.red),
+        );
+      }
     }
   }
 
@@ -668,7 +724,7 @@ class _CornerPainter extends CustomPainter {
 // ─────────────────────────────────────────────────
 // SET UP DEVICE STEP
 // ─────────────────────────────────────────────────
-class SetUpDeviceStep extends StatelessWidget {
+class SetUpDeviceStep extends StatefulWidget {
   final String? btRemoteId;
   final VoidCallback onAdd;
   final VoidCallback onCancel;
@@ -683,11 +739,40 @@ class SetUpDeviceStep extends StatelessWidget {
   });
 
   @override
+  State<SetUpDeviceStep> createState() => _SetUpDeviceStepState();
+}
+
+class _SetUpDeviceStepState extends State<SetUpDeviceStep> {
+  final _nameController = TextEditingController(text: 'Safechain001');
+  String? _nameError;
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    super.dispose();
+  }
+
+  void _validateAndAdd() {
+    final trimmed = _nameController.text.trim();
+    if (trimmed.isEmpty) {
+      setState(() => _nameError = 'Device name cannot be empty.');
+      return;
+    }
+    if (trimmed.length > 50) {
+      setState(() => _nameError = 'Device name must be 50 characters or fewer.');
+      return;
+    }
+    setState(() => _nameError = null);
+    widget.onNameChanged(trimmed);
+    widget.onAdd();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: onCancel),
+        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: widget.onCancel),
         title: const Text('Set Up Device', style: TextStyle(color: Colors.black)),
         centerTitle: true,
         backgroundColor: Colors.white,
@@ -713,7 +798,7 @@ class SetUpDeviceStep extends StatelessWidget {
                     const SizedBox(height: 16),
                     const Text('SafeChain Device Scanned ✅', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    Text('ID: ${btRemoteId ?? "Unknown"}', style: const TextStyle(color: Colors.grey)),
+                    Text('ID: ${widget.btRemoteId ?? "Unknown"}', style: const TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
@@ -721,15 +806,28 @@ class SetUpDeviceStep extends StatelessWidget {
               const Text('Device Name', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               TextFormField(
-                initialValue: 'Safechain001',
-                onChanged: onNameChanged,
+                controller: _nameController,
+                onChanged: (val) {
+                  // Clear error as user types
+                  if (_nameError != null) setState(() => _nameError = null);
+                  widget.onNameChanged(val);
+                },
+                maxLength: 50,
                 decoration: InputDecoration(
                   filled: true,
                   fillColor: const Color(0xFFF1F5F9),
                   hintText: 'e.g. My SafeChain Keychain',
+                  errorText: _nameError,
+                  counterText: '${_nameController.text.length}/50',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(12),
                     borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: _nameError != null
+                        ? const BorderSide(color: Colors.red, width: 1.5)
+                        : BorderSide.none,
                   ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                 ),
@@ -741,7 +839,7 @@ class SetUpDeviceStep extends StatelessWidget {
                     child: SizedBox(
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: onCancel,
+                        onPressed: widget.onCancel,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: const Color(0xFFF1F5F9), elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
@@ -755,7 +853,7 @@ class SetUpDeviceStep extends StatelessWidget {
                     child: SizedBox(
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: onAdd,
+                        onPressed: _validateAndAdd,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: kPrimaryGreen, elevation: 0,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),

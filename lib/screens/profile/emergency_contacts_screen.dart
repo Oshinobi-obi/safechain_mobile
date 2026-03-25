@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/widgets/phone_number_formatter.dart';
+import 'package:safechain/modals/error_modal.dart';
+import 'package:safechain/modals/success_modal.dart';
 
 class EmergencyContactsScreen extends StatefulWidget {
   const EmergencyContactsScreen({super.key});
@@ -212,6 +214,12 @@ class _EmergencyContactsScreenState extends State<EmergencyContactsScreen> {
                   contact['contact_number']!,
                   style: const TextStyle(color: Colors.grey),
                 ),
+                if (contact['email'] != null &&
+                    contact['email'].toString().isNotEmpty)
+                  Text(
+                    contact['email'].toString(),
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
                 if (contact['relationship'] != null &&
                     contact['relationship'].toString().isNotEmpty &&
                     contact['relationship'].toString() != 'None / Prefer not to say')
@@ -259,6 +267,7 @@ class _AddContactSheetState extends State<_AddContactSheet> {
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _contactController;
+  late TextEditingController _emailController;
   String? _selectedRelationship;
   bool _isLoading = false;
 
@@ -273,7 +282,37 @@ class _AddContactSheetState extends State<_AddContactSheet> {
     super.initState();
     _nameController = TextEditingController(text: widget.contact?['name']);
     _contactController = TextEditingController(text: widget.contact?['contact_number']);
+    _emailController = TextEditingController(text: widget.contact?['email']);
     _selectedRelationship = widget.contact?['relationship'];
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _contactController.dispose();
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  // ── Philippine number validation ─────────────────────────────────
+  // PH mobile numbers always start with 9 (e.g. 912-345-6789 → +63 912 345 6789)
+  // Starting with 8 is a landline prefix — not valid for mobile.
+  String? _validateContact(String? value) {
+    if (value == null || value.isEmpty) return 'Contact number is required.';
+    final digits = value.replaceAll('-', '').replaceAll(' ', '');
+    if (!RegExp(r'^9\d{9}$').hasMatch(digits)) {
+      return 'Enter a valid PH mobile number (e.g. 912-345-6789).';
+    }
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    if (value == null || value.trim().isEmpty) return null; // optional
+    final emailRegex = RegExp(r'^[\w\.-]+@[\w\.-]+\.\w{2,}$');
+    if (!emailRegex.hasMatch(value.trim())) {
+      return 'Enter a valid email address.';
+    }
+    return null;
   }
 
   Future<void> _saveContact() async {
@@ -291,14 +330,15 @@ class _AddContactSheetState extends State<_AddContactSheet> {
         ? 'https://safechain.site/api/mobile/update_contact.php'
         : 'https://safechain.site/api/mobile/add_contact.php';
 
-    final body = {
+    final Map<String, dynamic> body = {
       'resident_id': user.residentId,
-      'name': _nameController.text,
-      'contact_number': _contactController.text,
+      'name': _nameController.text.trim(),
+      'contact_number': _contactController.text.trim(),
+      'email': _emailController.text.trim(),
       'relationship': _selectedRelationship,
     };
 
-    if(isUpdating) {
+    if (isUpdating) {
       body['contact_id'] = widget.contact!['contact_id'];
     }
 
@@ -309,13 +349,40 @@ class _AddContactSheetState extends State<_AddContactSheet> {
         body: jsonEncode(body),
       );
 
-      if(response.statusCode == 200 || response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         widget.onSave();
         Navigator.pop(context);
-      }
 
+        // ── Success modal ──────────────────────────────────────────
+        final contactName = _nameController.text.trim();
+        await showDialog(
+          context: context,
+          builder: (_) => SuccessModal(
+            title: isUpdating ? 'Contact Updated!' : 'Contact Added!',
+            message: isUpdating
+                ? '$contactName\'s details have been updated successfully in your emergency contacts. 📋'
+                : '🎉 $contactName has been successfully saved to your emergency contacts. They\'ll be notified in case of an emergency.',
+          ),
+        );
+      } else {
+        // ── Error modal (server-side failure) ─────────────────────
+        await showDialog(
+          context: context,
+          builder: (_) => ErrorModal(
+            title: isUpdating ? 'Update Failed' : 'Could Not Add Contact',
+            message: 'Something went wrong while ${isUpdating ? "updating" : "adding"} this contact. Please check your connection and try again.',
+          ),
+        );
+      }
     } catch (e) {
-      // Handle error
+      // ── Error modal (network failure) ──────────────────────────
+      await showDialog(
+        context: context,
+        builder: (_) => const ErrorModal(
+          title: 'Connection Error',
+          message: 'Unable to reach the server. Please make sure you\'re connected to the internet and try again.',
+        ),
+      );
     } finally {
       setState(() => _isLoading = false);
     }
@@ -329,6 +396,7 @@ class _AddContactSheetState extends State<_AddContactSheet> {
         padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.of(context).padding.bottom),
         child: Form(
           key: _formKey,
+          autovalidateMode: AutovalidateMode.onUserInteraction,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
@@ -372,8 +440,9 @@ class _AddContactSheetState extends State<_AddContactSheet> {
                       controller: _contactController,
                       keyboardType: TextInputType.phone,
                       inputFormatters: [PhoneNumberFormatter()],
-                      validator: (value) => value!.isEmpty ? 'Please enter a contact number' : null,
+                      validator: _validateContact,
                       decoration: const InputDecoration(
+                        hintText: '912-345-6789',
                         fillColor: Color(0xFFF1F5F9),
                         filled: true,
                         border: OutlineInputBorder(
@@ -384,6 +453,21 @@ class _AddContactSheetState extends State<_AddContactSheet> {
                     ),
                   ),
                 ],
+              ),
+              const SizedBox(height: 24),
+              const Text('Email Address (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              const SizedBox(height: 8),
+              TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                validator: _validateEmail,
+                decoration: InputDecoration(
+                  hintText: 'Enter email address',
+                  fillColor: const Color(0xFFF1F5F9),
+                  filled: true,
+                  prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                ),
               ),
               const SizedBox(height: 24),
               const Text('Relationship (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),

@@ -155,8 +155,10 @@ class _PersonalInformationScreenState
     setState(() {
       if (digits.isEmpty) {
         _contactError = 'Contact number is required.';
-      } else if (!RegExp(r'^[89]\d{9}$').hasMatch(digits)) {
-        _contactError = 'Enter a valid Philippine mobile number (e.g. 912-3456-789).';
+      } else if (!RegExp(r'^9\d{9}$').hasMatch(digits)) {
+        // PH mobile numbers always start with 9 (e.g. 917, 912, 995)
+        // Numbers starting with 8 are landlines, not valid mobile numbers.
+        _contactError = 'Enter a valid Philippine mobile number (e.g. 912-345-6789).';
       } else {
         _contactError = null;
       }

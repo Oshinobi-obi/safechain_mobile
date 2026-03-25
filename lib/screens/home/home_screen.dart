@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:safechain/screens/notification/notification_screen.dart';
 import 'package:safechain/services/notification_service.dart';
+import 'package:safechain/services/ble_connection_service.dart';
 import 'package:safechain/widgets/profile_completion_banner.dart';
 import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/screens/add_device/add_device_flow.dart';
@@ -693,11 +694,9 @@ class _DeviceCardState extends State<DeviceCard> {
   }
 
   Future<void> _toggleConnection() async {
-    // Prevent spam clicking
     if (_isConnecting) return;
 
     if (_connectionState == BluetoothConnectionState.connected) {
-      // --- NEW CONFIRMATION LAYER ---
       final bool? confirm = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
@@ -716,14 +715,19 @@ class _DeviceCardState extends State<DeviceCard> {
         ),
       );
 
-      // Only disconnect if the user explicitly clicked "Disconnect"
       if (confirm == true) {
-        await _bleDevice.disconnect();
+        // Stop the background service + disconnect BLE
+        await BleConnectionService.instance.stop();
       }
     } else {
       setState(() => _isConnecting = true);
       try {
-        await _bleDevice.connect(timeout: const Duration(seconds: 5));
+        // Start background BLE service — keeps device connected even when
+        // the screen is off or the user navigates away
+        await BleConnectionService.instance.start(
+          widget.device.btRemoteId,
+          widget.device.name,
+        );
       } catch (e) {
         if (mounted) {
           setState(() => _isConnecting = false);
