@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:safechain/screens/notification/notification_screen.dart';
 import 'package:safechain/services/notification_service.dart';
 import 'package:safechain/services/ble_connection_service.dart';
+import 'package:safechain/widgets/offline_banner.dart';
 import 'package:safechain/widgets/profile_completion_banner.dart';
 import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/screens/add_device/add_device_flow.dart';
@@ -94,12 +95,34 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFFF8FAFC),
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 300),
-        child: widgetOptions.elementAt(_selectedIndex),
-        transitionBuilder: (Widget child, Animation<double> animation) {
-          return FadeTransition(opacity: animation, child: child);
-        },
+      // SafeArea(bottom:false) gives the Column a top inset equal to the status
+      // bar height, so the OfflineBanner starts strictly below the system UI —
+      // the status bar keeps its natural colour regardless of banner state.
+      // bottom:false is important — the BottomNavigationBar handles its own
+      // bottom safe area separately via the bottomNavigationBar slot.
+      // MediaQuery.removePadding(removeTop:true) on the tab content cancels the
+      // top inset for DevicesContent which already adds padding.top internally,
+      // preventing any double-offset gap.
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            const OfflineBanner(),
+            Expanded(
+              child: MediaQuery.removePadding(
+                context: context,
+                removeTop: true,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: widgetOptions.elementAt(_selectedIndex),
+                  transitionBuilder: (Widget child, Animation<double> animation) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
@@ -601,7 +624,76 @@ class _DevicesContentState extends State<DevicesContent> with TickerProviderStat
                 const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(32.0), child: Center(child: CircularProgressIndicator(color: Color(0xFF20C997))))),
 
               if (snapshot.hasError)
-                SliverToBoxAdapter(child: Padding(padding: const EdgeInsets.all(32.0), child: Center(child: Text("Error: ${snapshot.error}", style: const TextStyle(color: Colors.red))))),
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 32, 24, 0),
+                    child: Container(
+                      padding: const EdgeInsets.all(24),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.05),
+                            blurRadius: 10,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: const BoxDecoration(
+                              color: Color(0xFFFEF2F2),
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.wifi_off_rounded,
+                              color: Color(0xFFEF4444),
+                              size: 40,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          const Text(
+                            'No Internet Connection',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1F2937),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            'Your devices cannot be loaded right now.\nPlease check your connection and try again.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey,
+                              height: 1.5,
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          ElevatedButton.icon(
+                            onPressed: _refreshDevices,
+                            icon: const Icon(Icons.refresh_rounded, color: Colors.white, size: 18),
+                            label: const Text(
+                              'Try Again',
+                              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF20C997),
+                              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                              elevation: 0,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
 
               if (devices.isEmpty && snapshot.connectionState != ConnectionState.waiting && !snapshot.hasError)
                 const SliverToBoxAdapter(
