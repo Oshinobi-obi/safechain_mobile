@@ -6,12 +6,13 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:safechain/screens/forgot_password/reset_password_screen.dart';
 import 'package:safechain/screens/startup/startup_screen.dart';
+import 'package:safechain/services/connectivity_service.dart'; // ← NEW
 import 'package:safechain/services/notification_service.dart';
 import 'package:safechain/firebase_options.dart';
 
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// ── Background FCM handler (Android/iOS only) ────────────────────
+// ── Background FCM handler (Android/iOS only) ─────────────────────────────
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -36,6 +37,9 @@ void main() async {
   if (Platform.isAndroid || Platform.isIOS) {
     await NotificationService.initializeFCM();
   }
+
+  // ── Start monitoring internet connectivity ────────────────────────────────
+  ConnectivityService().initialize();
 
   runApp(const MyApp());
 }

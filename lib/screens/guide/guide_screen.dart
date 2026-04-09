@@ -200,7 +200,7 @@ class GuideScreen extends StatelessWidget {
                                       SizedBox(height: 16),
                                       Row(children: [Icon(Icons.email, color: Color(0xFF20C997), size: 18), SizedBox(width: 8), Text('support@safechain.site')]),
                                       SizedBox(height: 8),
-                                      Row(children: [Icon(Icons.phone, color: Color(0xFF20C997), size: 18), SizedBox(width: 8), Text('+63 900 000 0000')]),
+                                      Row(children: [Icon(Icons.phone, color: Color(0xFF20C997), size: 18), SizedBox(width: 8), Text('+63 : 9')]),
                                     ],
                                   ),
                                   actions: [

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:safechain/services/session_manager.dart';
 import 'package:safechain/widgets/phone_number_formatter.dart';
@@ -264,12 +265,18 @@ class _AddContactSheet extends StatefulWidget {
 }
 
 class _AddContactSheetState extends State<_AddContactSheet> {
+  static const Color _kGreen = Color(0xFF20C997);
+  static const Color _kBg    = Color(0xFFF1F5F9);
+
   final _formKey = GlobalKey<FormState>();
   late TextEditingController _nameController;
   late TextEditingController _contactController;
   late TextEditingController _emailController;
   String? _selectedRelationship;
   bool _isLoading = false;
+
+  // ── Real-time contact error state (mirrors personal_information_screen) ──
+  String? _contactError;
 
   bool get isUpdating => widget.contact != null;
 
@@ -280,10 +287,13 @@ class _AddContactSheetState extends State<_AddContactSheet> {
   @override
   void initState() {
     super.initState();
-    _nameController = TextEditingController(text: widget.contact?['name']);
+    _nameController    = TextEditingController(text: widget.contact?['name']);
     _contactController = TextEditingController(text: widget.contact?['contact_number']);
-    _emailController = TextEditingController(text: widget.contact?['email']);
+    _emailController   = TextEditingController(text: widget.contact?['email']);
     _selectedRelationship = widget.contact?['relationship'];
+
+    // Real-time validation listener — same pattern as personal_information_screen
+    _contactController.addListener(_validateContact);
   }
 
   @override
@@ -294,16 +304,19 @@ class _AddContactSheetState extends State<_AddContactSheet> {
     super.dispose();
   }
 
-  // ── Philippine number validation ─────────────────────────────────
+  // ── Real-time contact validation ──────────────────────────────────
   // PH mobile numbers always start with 9 (e.g. 912-345-6789 → +63 912 345 6789)
-  // Starting with 8 is a landline prefix — not valid for mobile.
-  String? _validateContact(String? value) {
-    if (value == null || value.isEmpty) return 'Contact number is required.';
-    final digits = value.replaceAll('-', '').replaceAll(' ', '');
-    if (!RegExp(r'^9\d{9}$').hasMatch(digits)) {
-      return 'Enter a valid PH mobile number (e.g. 912-345-6789).';
-    }
-    return null;
+  void _validateContact() {
+    final digits = _contactController.text.replaceAll('-', '').replaceAll(' ', '');
+    setState(() {
+      if (digits.isEmpty) {
+        _contactError = 'Contact number is required.';
+      } else if (!RegExp(r'^9\d{9}$').hasMatch(digits)) {
+        _contactError = 'Enter a valid Philippine mobile number (e.g. 912-345-6789).';
+      } else {
+        _contactError = null;
+      }
+    });
   }
 
   String? _validateEmail(String? value) {
@@ -316,7 +329,10 @@ class _AddContactSheetState extends State<_AddContactSheet> {
   }
 
   Future<void> _saveContact() async {
+    // Trigger contact validation before checking form
+    _validateContact();
     if (!_formKey.currentState!.validate()) return;
+    if (_contactError != null) return;
 
     setState(() => _isLoading = true);
 
@@ -353,7 +369,6 @@ class _AddContactSheetState extends State<_AddContactSheet> {
         widget.onSave();
         Navigator.pop(context);
 
-        // ── Success modal ──────────────────────────────────────────
         final contactName = _nameController.text.trim();
         await showDialog(
           context: context,
@@ -365,7 +380,6 @@ class _AddContactSheetState extends State<_AddContactSheet> {
           ),
         );
       } else {
-        // ── Error modal (server-side failure) ─────────────────────
         await showDialog(
           context: context,
           builder: (_) => ErrorModal(
@@ -375,7 +389,6 @@ class _AddContactSheetState extends State<_AddContactSheet> {
         );
       }
     } catch (e) {
-      // ── Error modal (network failure) ──────────────────────────
       await showDialog(
         context: context,
         builder: (_) => const ErrorModal(
@@ -386,6 +399,108 @@ class _AddContactSheetState extends State<_AddContactSheet> {
     } finally {
       setState(() => _isLoading = false);
     }
+  }
+
+  // ── Contact field — exact same styling as personal_information_screen ──
+  Widget _buildContactField() {
+    final hasError = _contactError != null;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Contact Number',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // ── Flag + prefix container ────────────────────────────
+            Container(
+              height: 56,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: hasError ? const Color(0xFFFFF0F0) : _kBg,
+                border: hasError
+                    ? Border.all(color: Colors.red, width: 1.2)
+                    : null,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  bottomLeft: Radius.circular(20),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Image.asset('images/philippine_flag.png', width: 24),
+                  const SizedBox(width: 8),
+                  const Text('+63',
+                      style: TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16)),
+                ],
+              ),
+            ),
+            // ── Text input ─────────────────────────────────────────
+            Expanded(
+              child: SizedBox(
+                height: 56,
+                child: TextField(
+                  controller: _contactController,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(10),
+                    PhoneNumberFormatter(),
+                  ],
+                  decoration: InputDecoration(
+                    hintText: '912-345-6789',
+                    fillColor: hasError ? const Color(0xFFFFF0F0) : _kBg,
+                    filled: true,
+                    border: OutlineInputBorder(
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
+                      ),
+                      borderSide: hasError
+                          ? const BorderSide(color: Colors.red, width: 1.2)
+                          : BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
+                      ),
+                      borderSide: hasError
+                          ? const BorderSide(color: Colors.red, width: 1.2)
+                          : BorderSide.none,
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: const BorderRadius.only(
+                        topRight: Radius.circular(20),
+                        bottomRight: Radius.circular(20),
+                      ),
+                      borderSide: BorderSide(
+                        color: hasError ? Colors.red : _kGreen,
+                        width: 1.5,
+                      ),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 20),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+        // ── Error text below the row ────────────────────────────────
+        if (hasError)
+          Padding(
+            padding: const EdgeInsets.only(left: 16, top: 6),
+            child: Text(
+              _contactError!,
+              style: const TextStyle(color: Colors.red, fontSize: 12),
+            ),
+          ),
+      ],
+    );
   }
 
   @override
@@ -417,43 +532,31 @@ class _AddContactSheetState extends State<_AddContactSheet> {
                   hintText: 'Enter Full Name',
                   fillColor: const Color(0xFFF1F5F9),
                   filled: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: Color(0xFF20C997), width: 1.5),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
-              const Text('Contact Number', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
-                      borderRadius: const BorderRadius.only(topLeft: Radius.circular(20), bottomLeft: Radius.circular(20)),
-                    ),
-                    child: Row(
-                      children: [Image.asset('images/philippine_flag.png', width: 24), const SizedBox(width: 8), const Text('+63', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))],
-                    ),
-                  ),
-                  Expanded(
-                    child: TextFormField(
-                      controller: _contactController,
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [PhoneNumberFormatter()],
-                      validator: _validateContact,
-                      decoration: const InputDecoration(
-                        hintText: '912-345-6789',
-                        fillColor: Color(0xFFF1F5F9),
-                        filled: true,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.only(topRight: Radius.circular(20), bottomRight: Radius.circular(20)),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              // ── Contact field with full red/green border logic ────
+              _buildContactField(),
               const SizedBox(height: 24),
               const Text('Email Address (optional)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(height: 8),
@@ -466,7 +569,26 @@ class _AddContactSheetState extends State<_AddContactSheet> {
                   fillColor: const Color(0xFFF1F5F9),
                   filled: true,
                   prefixIcon: const Icon(Icons.email_outlined, color: Colors.grey),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: Color(0xFF20C997), width: 1.5),
+                  ),
+                  errorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                  ),
+                  focusedErrorBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: Colors.red, width: 1.5),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),
@@ -474,13 +596,16 @@ class _AddContactSheetState extends State<_AddContactSheet> {
               const SizedBox(height: 8),
               DropdownButtonFormField<String>(
                 value: _selectedRelationship,
-                items: _relationships.map((relationship) => DropdownMenuItem(value: relationship, child: Text(relationship))).toList(),
+                items: _relationships.map((r) => DropdownMenuItem(value: r, child: Text(r))).toList(),
                 onChanged: (value) => setState(() => _selectedRelationship = value),
                 decoration: InputDecoration(
                   hintText: 'Select relationship',
                   fillColor: const Color(0xFFF1F5F9),
                   filled: true,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: BorderSide.none,
+                  ),
                 ),
               ),
               const SizedBox(height: 32),
@@ -489,11 +614,18 @@ class _AddContactSheetState extends State<_AddContactSheet> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF20C997),
                   minimumSize: const Size(double.infinity, 56),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20)),
                 ),
                 child: _isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : Text(isUpdating ? 'Save Changes' : 'Add Contact', style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.bold)),
+                    : Text(
+                  isUpdating ? 'Save Changes' : 'Add Contact',
+                  style: const TextStyle(
+                      fontSize: 18,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
