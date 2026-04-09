@@ -23,8 +23,9 @@ class Device {
   final String name;
   final String btRemoteId;
   final int battery;
+  final String status;
 
-  Device({required this.deviceId, required this.name, required this.btRemoteId, required this.battery});
+  Device({required this.deviceId, required this.name, required this.btRemoteId, required this.battery, required this.status});
 
   factory Device.fromJson(Map<String, dynamic> json) {
     return Device(
@@ -32,6 +33,7 @@ class Device {
       name: json['name'] ?? 'Unnamed Device',
       btRemoteId: json['bt_remote_id'] ?? 'No ID',
       battery: json['battery'] is int ? json['battery'] : int.tryParse(json['battery'].toString()) ?? 0,
+      status: json['status'] ?? 'active', // 👈 Add this
     );
   }
 }
@@ -293,6 +295,32 @@ class _DevicesContentState extends State<DevicesContent> with TickerProviderStat
     }
   }
 
+  // ── MARK MISSING ────────────────────────────
+  Future<void> _markDeviceMissing(int deviceId) async {
+    try {
+      final response = await http.post(
+        Uri.parse('https://safechain.site/api/mobile/mark_missing.php'), // 👈 You will need to create this PHP file
+        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        body: jsonEncode({'device_id': deviceId}),
+      );
+      final body = jsonDecode(response.body);
+      if (response.statusCode == 200 && body['status'] == 'success') {
+        _refreshDevices();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Device marked as missing. It is now deactivated.'), backgroundColor: Colors.orange),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Network error. Please try again.'), backgroundColor: Colors.red),
+        );
+      }
+    }
+  }
+
   void _showDeviceSettings(BuildContext context, Device device) {
     final TextEditingController nameController = TextEditingController(text: device.name);
     bool isSaving = false;
@@ -414,6 +442,35 @@ class _DevicesContentState extends State<DevicesContent> with TickerProviderStat
                     child: isUnlinking
                         ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.red, strokeWidth: 2))
                         : const Text('Unlink Device', style: TextStyle(color: Colors.red, fontSize: 16)),
+                  ),
+                  // ── MARK AS MISSING BUTTON ──
+                  TextButton(
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Row(
+                            children: [Icon(Icons.warning_amber_rounded, color: Colors.orange), SizedBox(width: 8), Text('Mark as Missing?')],
+                          ),
+                          content: Text('Are you sure you want to mark "${device.name}" as missing? This will immediately deactivate the device so it cannot trigger false alarms.'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: const Text('Mark Missing', style: TextStyle(color: Colors.orange)),
+                            ),
+                          ],
+                        ),
+                      );
+                      if (confirm == true) {
+                        Navigator.pop(bc); // Close the settings modal
+                        await _markDeviceMissing(device.deviceId);
+                      }
+                    },
+                    child: const Text('Report Device Missing', style: TextStyle(color: Colors.orange, fontSize: 16)),
                   ),
                   const SizedBox(height: 20),
                 ],

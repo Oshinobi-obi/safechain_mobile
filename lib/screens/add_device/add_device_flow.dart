@@ -33,43 +33,53 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
   String? _scannedBtRemoteId;
   String _deviceName = 'Safechain001';
 
-  @override
-  void initState() {
-    super.initState();
-    // Removed the auto-Bluetooth check so the app always starts at the QR instructions
-  }
+  // ── [FIX-1] Loading state owned by the parent ─────────────────────────────
+  // SetUpDeviceStep used a VoidCallback — it fired onAdd() and returned
+  // immediately with no way to know when the async work finished.
+  // Now _isRegistering drives the spinner inside SetUpDeviceStep.
+  bool _isRegistering = false;
 
   void _nextStep() => setState(() => _currentIndex++);
   void _goToStep(int step) => setState(() => _currentIndex = step);
 
+  // ── _addDevice: returns Future<void> so SetUpDeviceStep can await it ───────
   Future<void> _addDevice() async {
-    // ── 1. Session check ─────────────────────────────────────────
+    // ── 1. Session check ──────────────────────────────────────────────────────
     final user = await SessionManager.getUser();
     if (user == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You must be logged in to add a device.'), backgroundColor: Colors.red),
+          const SnackBar(
+            content: Text('You must be logged in to add a device.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
       return;
     }
 
-    // ── 2. Scanned device guard ───────────────────────────────────
+    // ── 2. Scanned device guard ───────────────────────────────────────────────
     if (_scannedBtRemoteId == null || _scannedBtRemoteId!.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('No device scanned. Please scan the QR code first.'), backgroundColor: Colors.red),
+          const SnackBar(
+            content: Text('No device scanned. Please scan the QR code first.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
       return;
     }
 
-    // ── 3. Device name validation ─────────────────────────────────
+    // ── 3. Device name validation ─────────────────────────────────────────────
     final trimmedName = _deviceName.trim();
     if (trimmedName.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Device name cannot be empty.'), backgroundColor: Colors.red),
+          const SnackBar(
+            content: Text('Device name cannot be empty.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
       return;
@@ -77,7 +87,10 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
     if (trimmedName.length > 50) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Device name must be 50 characters or fewer.'), backgroundColor: Colors.red),
+          const SnackBar(
+            content: Text('Device name must be 50 characters or fewer.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
       return;
@@ -85,72 +98,138 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
 
     final String btRemoteId = _scannedBtRemoteId!;
 
-    // ── 4. Cloud ownership check (bt_remote_id vs resident_id) ───
-    // Ensures this MAC address isn't already registered to ANY resident.
-    // Backend checks the devices table: if bt_remote_id exists with a
-    // different resident_id → 'taken'; same resident_id → 'owned'.
+    // Show spinner inside SetUpDeviceStep button
+    if (mounted) setState(() => _isRegistering = true);
+
+    // ── 4. Cloud ownership check ──────────────────────────────────────────────
     try {
       final checkResponse = await http.get(
-        Uri.parse('https://safechain.site/api/mobile/check_device.php?bt_remote_id=$btRemoteId&resident_id=${user.residentId}'),
+        Uri.parse(
+          'https://safechain.site/api/mobile/check_device.php'
+              '?bt_remote_id=$btRemoteId'
+              '&resident_id=${user.residentId}',
+        ),
+        headers: {
+          'User-Agent': 'SafeChainMobileApp/1.0',
+          'Accept': 'application/json',
+        },
       );
 
       if (checkResponse.statusCode == 200) {
         final checkBody = jsonDecode(checkResponse.body);
+        final status = checkBody['status'] as String? ?? '';
 
-        if (checkBody['status'] == 'taken') {
+        // ── [FIX-2] Handle 'unauthorized' — MAC not in authorized_hardware ───
+        // check_device.php returns {status:'unauthorized'} with HTTP 200 when
+        // the scanned MAC has never been whitelisted by an admin.
+        // The original code only checked 'taken' and 'owned', so 'unauthorized'
+        // fell through to add_device.php which returned 403, giving the user
+        // a confusing "server error 403" message with no explanation.
+        if (status == 'unauthorized') {
           if (mounted) {
+            setState(() => _isRegistering = false);
             showDialog(
               context: context,
               builder: (ctx) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                title: const Row(children: [Icon(Icons.link_off, color: Colors.red), SizedBox(width: 8), Text('Device Already Linked')]),
-                content: const Text('This device is already linked to another account. Please use a different device or contact support.'),
-                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK', style: TextStyle(color: kPrimaryGreen)))],
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                title: const Row(children: [
+                  Icon(Icons.block, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Device Not Authorized'),
+                ]),
+                content: const Text(
+                  'This device has not been authorized by your barangay administrator. '
+                      'Please contact your barangay office to register this device '
+                      'before pairing it.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('OK',
+                        style: TextStyle(color: kPrimaryGreen)),
+                  ),
+                ],
               ),
             );
           }
           return;
         }
 
-        if (checkBody['status'] == 'owned') {
+        if (status == 'taken') {
           if (mounted) {
+            setState(() => _isRegistering = false);
             showDialog(
               context: context,
               builder: (ctx) => AlertDialog(
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                title: const Row(children: [Icon(Icons.info_outline, color: kPrimaryGreen), SizedBox(width: 8), Text('Already Added')]),
-                content: const Text('This device is already linked to your account. You can find it in your device list.'),
-                actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK', style: TextStyle(color: kPrimaryGreen)))],
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16)),
+                title: const Row(children: [
+                  Icon(Icons.link_off, color: Colors.red),
+                  SizedBox(width: 8),
+                  Text('Device Already Linked'),
+                ]),
+                content: const Text(
+                  'This device is already linked to another account. '
+                      'Please use a different device or contact support.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('OK',
+                        style: TextStyle(color: kPrimaryGreen)),
+                  ),
+                ],
               ),
             );
           }
           return;
         }
+
+        if (status == 'owned') {
+          // Device already belongs to this resident.
+          // Still proceed to add_device.php — it will return the existing
+          // device_id with action:'already_owned' so we can re-provision ESP32.
+          // Do NOT return here.
+        }
+
       } else {
-        // Server returned unexpected status — block registration
         if (mounted) {
+          setState(() => _isRegistering = false);
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Could not verify device ownership. Please try again.'), backgroundColor: Colors.orange),
+            const SnackBar(
+              content: Text(
+                  'Could not verify device ownership. Please try again.'),
+              backgroundColor: Colors.orange,
+            ),
           );
         }
         return;
       }
     } catch (e) {
-      // Network error during ownership check — block registration, don't proceed blindly
       debugPrint('Device check error: $e');
       if (mounted) {
+        setState(() => _isRegistering = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Network error. Please check your connection and try again.'), backgroundColor: Colors.red),
+          const SnackBar(
+            content:
+            Text('Network error. Please check your connection and try again.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
       return;
     }
 
-    // ── 5. Cloud registration ─────────────────────────────────────
+    // ── 5. Cloud registration ─────────────────────────────────────────────────
     try {
       final response = await http.post(
         Uri.parse('https://safechain.site/api/mobile/add_device.php'),
-        headers: {'Content-Type': 'application/json; charset=UTF-8'},
+        headers: {
+          'Content-Type': 'application/json; charset=UTF-8',
+          'Accept': 'application/json',
+          'User-Agent': 'SafeChainMobileApp/1.0',
+        },
         body: jsonEncode(<String, String>{
           'resident_id': user.residentId,
           'name': trimmedName,
@@ -158,30 +237,87 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
         }),
       );
 
-      if (response.statusCode == 201) {
+      // ── [FIX-3] Accept both 201 (new) and 200 already_owned (re-link) ──────
+      // add_device.php returns HTTP 201 for new registrations and HTTP 200
+      // with action:'already_owned' when the same resident re-scans their
+      // own device. Both carry a valid device_id we can use to provision ESP32.
+      final isSuccess =
+          response.statusCode == 201 ||
+              (response.statusCode == 200 &&
+                  (jsonDecode(response.body)['action'] == 'already_owned'));
+
+      if (isSuccess) {
+        final responseData = jsonDecode(response.body);
+        final newDeviceId = responseData['device_id'].toString();
+
+        // ── BLE provisioning: write setid <N> to ESP32 ────────────────────────
+        try {
+          final device = BluetoothDevice.fromId(_scannedBtRemoteId!);
+          await device.connect(timeout: const Duration(seconds: 5));
+          final services = await device.discoverServices();
+          final service = services.firstWhere(
+                (s) =>
+            s.uuid.toString().toUpperCase() ==
+                '6E400001-B5A3-F393-E0A9-E50E24DCCA9E',
+          );
+          final rxChar = service.characteristics.firstWhere(
+                (c) =>
+            c.uuid.toString().toUpperCase() ==
+                '6E400002-B5A3-F393-E0A9-E50E24DCCA9E',
+          );
+          await rxChar.write(
+            utf8.encode('setid $newDeviceId\n'),
+            withoutResponse: false,
+          );
+          debugPrint('Provisioned ESP32 with ID: $newDeviceId');
+          await device.disconnect();
+        } catch (e) {
+          // BLE provisioning failure is non-fatal — user can re-provision
+          // later. The cloud record exists so they don't lose the device.
+          debugPrint('BLE Provisioning Error: $e');
+        }
+
         await NotificationService.addNotification(
           'New Device Added',
           'Successfully added $trimmedName to your account.',
           NotificationType.device,
         );
-        _nextStep(); // Moves to TestingGatewayStep only on success
+
+        if (mounted) setState(() => _isRegistering = false);
+        _nextStep(); // → TestingGatewayStep
+
       } else {
-        // API returned a non-201 — show error, do not advance
+        // ── Specific error messages based on HTTP status ───────────────────────
+        String errorMessage;
+        try {
+          final body = jsonDecode(response.body);
+          errorMessage = body['message'] as String? ??
+              'Registration failed (${response.statusCode}).';
+        } catch (_) {
+          errorMessage = 'Registration failed (${response.statusCode}).';
+        }
+
         if (mounted) {
+          setState(() => _isRegistering = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to register device (server error ${response.statusCode}). Please try again.'),
+              content: Text(errorMessage),
               backgroundColor: Colors.red,
+              duration: const Duration(seconds: 5),
             ),
           );
         }
       }
     } catch (e) {
-      // Network failure during registration — do NOT silently advance
       debugPrint('Add device error: $e');
       if (mounted) {
+        setState(() => _isRegistering = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Network error during registration. Please try again.'), backgroundColor: Colors.red),
+          const SnackBar(
+            content:
+            Text('Network error during registration. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     }
@@ -203,26 +339,31 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
         },
         onCancel: () => _goToStep(0),
       ),
-      // 2. Ask BT Permissions (If already on, user taps Enable to pass)
+      // 2. Ask BT Permissions
       EnableBluetoothStep(
         onEnable: () => _goToStep(3),
         onSkip: () => _goToStep(3),
       ),
-      // 3. Local Verification (Now has Visual Feedback)
+      // 3. Local BLE Verification
       ConnectingDeviceStep(
         btRemoteId: _scannedBtRemoteId,
         onSuccess: () => _goToStep(4),
         onError: () => _goToStep(8),
       ),
-      // 4. Cloud Registration
+      // 4. Cloud Registration — isLoading passed down so button shows spinner
       SetUpDeviceStep(
         btRemoteId: _scannedBtRemoteId,
-        onAdd: _addDevice, // Internal API call moves index to 5
+        isLoading: _isRegistering,
+        onAdd: _addDevice,
         onCancel: () => _goToStep(0),
         onNameChanged: (name) => setState(() => _deviceName = name),
       ),
-      // 5. Gateway Test
-      TestingGatewayStep(onSuccess: () => _goToStep(6), onError: () => _goToStep(8)),
+      // 5. Gateway Range Test
+      TestingGatewayStep(
+        btRemoteId: _scannedBtRemoteId,
+        onSuccess: () => _goToStep(6),
+        onError: () => _goToStep(8),
+      ),
       // 6. Success Summary
       AllSetStep(
         onTestGps: () {
@@ -238,12 +379,14 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
             );
           }
         },
-        onGoToDeviceList: () => Navigator.pushReplacement(context, FadePageRoute(child: const HomeScreen())),
+        onGoToDeviceList: () => Navigator.pushReplacement(
+            context, FadePageRoute(child: const HomeScreen())),
       ),
-      // 7. Location Testing
+      // 7. GPS Testing
       GpsTestingStep(btRemoteId: _scannedBtRemoteId, onBack: () => _goToStep(6)),
       // 8. Error Screen
-      ConnectionUnsuccessfulStep(onTryAgain: () => _goToStep(1), onViewMap: () {}),
+      ConnectionUnsuccessfulStep(
+          onTryAgain: () => _goToStep(1), onViewMap: () {}),
     ];
 
     return Scaffold(
@@ -256,7 +399,8 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
               secondaryAnimation: secondaryAnimation,
               child: child,
             ),
-        child: KeyedSubtree(key: ValueKey(_currentIndex), child: pages[_currentIndex]),
+        child: KeyedSubtree(
+            key: ValueKey(_currentIndex), child: pages[_currentIndex]),
       ),
     );
   }
@@ -268,7 +412,8 @@ class _AddDeviceFlowState extends State<AddDeviceFlow> {
 class EnableBluetoothStep extends StatefulWidget {
   final VoidCallback onEnable;
   final VoidCallback onSkip;
-  const EnableBluetoothStep({super.key, required this.onEnable, required this.onSkip});
+  const EnableBluetoothStep(
+      {super.key, required this.onEnable, required this.onSkip});
 
   @override
   State<EnableBluetoothStep> createState() => _EnableBluetoothStepState();
@@ -298,7 +443,9 @@ class _EnableBluetoothStepState extends State<EnableBluetoothStep> {
         } catch (_) {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Please enable Bluetooth from your settings.')),
+              const SnackBar(
+                  content:
+                  Text('Please enable Bluetooth from your settings.')),
             );
           }
         }
@@ -353,7 +500,8 @@ class _EnableBluetoothStepState extends State<EnableBluetoothStep> {
               Navigator.of(context).pop();
               perm.openAppSettings();
             },
-            child: const Text('Open Settings', style: TextStyle(color: kPrimaryGreen)),
+            child: const Text('Open Settings',
+                style: TextStyle(color: kPrimaryGreen)),
           ),
         ],
       ),
@@ -370,46 +518,73 @@ class _EnableBluetoothStepState extends State<EnableBluetoothStep> {
           child: Column(
             children: [
               const SizedBox(height: 32),
-              SizedBox(height: 220, child: Center(child: RipplePulse(color: kPrimaryBlue, icon: Icons.bluetooth))),
+              SizedBox(
+                  height: 220,
+                  child: Center(
+                      child:
+                      RipplePulse(color: kPrimaryBlue, icon: Icons.bluetooth))),
               const SizedBox(height: 8),
-              const Text('Enable Bluetooth', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              const Text('Enable Bluetooth',
+                  style:
+                  TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               const Text(
                 'We need Bluetooth access to connect\nto your emergency device',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 15, color: Color(0xFF4F4F4F), height: 1.6),
+                style: TextStyle(
+                    fontSize: 15,
+                    color: Color(0xFF4F4F4F),
+                    height: 1.6),
               ),
               const SizedBox(height: 8),
               const Text(
                 'This allows your phone to communicate with the device',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey, height: 1.5),
+                style:
+                TextStyle(fontSize: 12, color: Colors.grey, height: 1.5),
               ),
               const SizedBox(height: 40),
               SizedBox(
-                width: double.infinity, height: 56,
+                width: double.infinity,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: _isRequesting ? null : _enableBluetooth,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimaryGreen, elevation: 4,
+                    backgroundColor: kPrimaryGreen,
+                    elevation: 4,
                     shadowColor: kPrimaryGreen.withOpacity(0.4),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(99)),
                   ),
                   child: _isRequesting
-                      ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5))
-                      : const Text('Enable', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
+                      ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                          color: Colors.white, strokeWidth: 2.5))
+                      : const Text('Enable',
+                      style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white)),
                 ),
               ),
               const SizedBox(height: 14),
               SizedBox(
-                width: double.infinity, height: 56,
+                width: double.infinity,
+                height: 56,
                 child: TextButton(
                   onPressed: widget.onSkip,
                   style: TextButton.styleFrom(
                     backgroundColor: const Color(0xFFF1F5F9),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(99)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(99)),
                   ),
-                  child: const Text('Skip for Now', style: TextStyle(fontSize: 15, color: Color(0xFF505050), fontWeight: FontWeight.w500)),
+                  child: const Text('Skip for Now',
+                      style: TextStyle(
+                          fontSize: 15,
+                          color: Color(0xFF505050),
+                          fontWeight: FontWeight.w500)),
                 ),
               ),
               const SizedBox(height: 40),
@@ -427,14 +602,16 @@ class _EnableBluetoothStepState extends State<EnableBluetoothStep> {
 class PairYourDeviceStep extends StatelessWidget {
   final VoidCallback onStart;
   final VoidCallback onBack;
-  const PairYourDeviceStep({super.key, required this.onStart, required this.onBack});
+  const PairYourDeviceStep(
+      {super.key, required this.onStart, required this.onBack});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: onBack),
+        leading: IconButton(
+            icon: const Icon(Icons.arrow_back), onPressed: onBack),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black,
@@ -445,12 +622,17 @@ class PairYourDeviceStep extends StatelessWidget {
           child: Column(
             children: [
               Container(
-                width: 100, height: 100,
-                decoration: const BoxDecoration(color: kLightGreenBg, shape: BoxShape.circle),
-                child: const Icon(Icons.qr_code_scanner, size: 50, color: kPrimaryGreen),
+                width: 100,
+                height: 100,
+                decoration: const BoxDecoration(
+                    color: kLightGreenBg, shape: BoxShape.circle),
+                child: const Icon(Icons.qr_code_scanner,
+                    size: 50, color: kPrimaryGreen),
               ),
               const SizedBox(height: 24),
-              const Text('Pair Your Device', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const Text('Pair Your Device',
+                  style:
+                  TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
               const Text(
                 'Follow the steps below then scan the QR code on your device',
@@ -458,19 +640,30 @@ class PairYourDeviceStep extends StatelessWidget {
                 style: TextStyle(color: Colors.grey, fontSize: 14),
               ),
               const SizedBox(height: 40),
-              _buildInstructionCard(1, 'Power On Device', 'Slide the power button to turn on the Deivcce.', Icons.power_settings_new),
+              _buildInstructionCard(1, 'Power On Device',
+                  'Slide the power button to turn on the Device.',
+                  Icons.power_settings_new),
               const SizedBox(height: 16),
-              _buildInstructionCard(2, 'Scan QR Code', 'Point your camera at the QR code on the device.', Icons.qr_code),
+              _buildInstructionCard(2, 'Scan QR Code',
+                  'Point your camera at the QR code on the device.',
+                  Icons.qr_code),
               const SizedBox(height: 40),
               SizedBox(
-                width: double.infinity, height: 56,
+                width: double.infinity,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: onStart,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimaryGreen, elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    backgroundColor: kPrimaryGreen,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30)),
                   ),
-                  child: const Text('Scan QR Code', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.white)),
+                  child: const Text('Scan QR Code',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white)),
                 ),
               ),
             ],
@@ -480,7 +673,8 @@ class PairYourDeviceStep extends StatelessWidget {
     );
   }
 
-  Widget _buildInstructionCard(int step, String title, String subtitle, IconData icon) {
+  Widget _buildInstructionCard(
+      int step, String title, String subtitle, IconData icon) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
       decoration: BoxDecoration(
@@ -494,21 +688,32 @@ class PairYourDeviceStep extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 30, height: 30,
+            width: 30,
+            height: 30,
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.2),
               shape: BoxShape.circle,
               border: Border.all(color: Colors.white, width: 1.5),
             ),
-            child: Center(child: Text('$step', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold))),
+            child: Center(
+                child: Text('$step',
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold))),
           ),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
-                Text(subtitle, style: TextStyle(color: Colors.white.withOpacity(0.9), fontSize: 13)),
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                        color: Colors.white)),
+                Text(subtitle,
+                    style: TextStyle(
+                        color: Colors.white.withOpacity(0.9), fontSize: 13)),
               ],
             ),
           ),
@@ -525,7 +730,8 @@ class PairYourDeviceStep extends StatelessWidget {
 class QRScanStep extends StatefulWidget {
   final Function(String btRemoteId) onScanned;
   final VoidCallback onCancel;
-  const QRScanStep({super.key, required this.onScanned, required this.onCancel});
+  const QRScanStep(
+      {super.key, required this.onScanned, required this.onCancel});
 
   @override
   State<QRScanStep> createState() => _QRScanStepState();
@@ -553,7 +759,8 @@ class _QRScanStepState extends State<QRScanStep> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Invalid QR code. Please scan the QR code on your SafeChain device.'),
+            content: Text(
+                'Invalid QR code. Please scan the QR code on your SafeChain device.'),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 2),
           ),
@@ -577,15 +784,21 @@ class _QRScanStepState extends State<QRScanStep> {
           _QROverlay(),
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding:
+              const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
                     onPressed: widget.onCancel,
-                    icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                    icon: const Icon(Icons.arrow_back_ios_new,
+                        color: Colors.white),
                   ),
-                  const Text('Scan QR Code', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('Scan QR Code',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold)),
                   IconButton(
                     onPressed: () {
                       setState(() => _torchOn = !_torchOn);
@@ -609,7 +822,8 @@ class _QRScanStepState extends State<QRScanStep> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
                       decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.55),
                         borderRadius: BorderRadius.circular(30),
@@ -617,13 +831,16 @@ class _QRScanStepState extends State<QRScanStep> {
                       child: const Text(
                         'Point the camera at the QR code\non your SafeChain device',
                         textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.white, fontSize: 14, height: 1.5),
+                        style: TextStyle(
+                            color: Colors.white, fontSize: 14, height: 1.5),
                       ),
                     ),
                     const SizedBox(height: 20),
                     TextButton(
                       onPressed: widget.onCancel,
-                      child: const Text('Cancel', style: TextStyle(color: Colors.white70, fontSize: 16)),
+                      child: const Text('Cancel',
+                          style:
+                          TextStyle(color: Colors.white70, fontSize: 16)),
                     ),
                   ],
                 ),
@@ -637,23 +854,25 @@ class _QRScanStepState extends State<QRScanStep> {
 }
 
 // ─────────────────────────────────────────────────
-// QR OVERLAY — dark background + green scan box
+// QR OVERLAY
 // ─────────────────────────────────────────────────
 class _QROverlay extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
     const boxSize = 260.0;
-    final top  = (size.height - boxSize) / 2 - 40;
-    final left = (size.width  - boxSize) / 2;
+    final top = (size.height - boxSize) / 2 - 40;
+    final left = (size.width - boxSize) / 2;
 
     return Stack(
       children: [
         Container(color: Colors.black.withOpacity(0.55)),
         Positioned(
-          top: top, left: left,
+          top: top,
+          left: left,
           child: Container(
-            width: boxSize, height: boxSize,
+            width: boxSize,
+            height: boxSize,
             decoration: BoxDecoration(
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(16),
@@ -667,29 +886,31 @@ class _QROverlay extends StatelessWidget {
   }
 
   List<Widget> _corners(double top, double left, double size) {
-    const len   = 24.0;
+    const len = 24.0;
     const thick = 4.0;
-    const r     = 16.0;
+    const r = 16.0;
 
     Widget corner(double t, double l, bool flipH, bool flipV) {
       return Positioned(
-        top: t, left: l,
+        top: t,
+        left: l,
         child: Transform.scale(
           scaleX: flipH ? -1 : 1,
           scaleY: flipV ? -1 : 1,
           child: CustomPaint(
             size: const Size(len, len),
-            painter: _CornerPainter(color: kPrimaryGreen, thickness: thick, radius: r),
+            painter: _CornerPainter(
+                color: kPrimaryGreen, thickness: thick, radius: r),
           ),
         ),
       );
     }
 
     return [
-      corner(top - 2,               left - 2,               false, false),
-      corner(top - 2,               left + size - len + 2,  true,  false),
-      corner(top + size - len + 2,  left - 2,               false, true),
-      corner(top + size - len + 2,  left + size - len + 2,  true,  true),
+      corner(top - 2, left - 2, false, false),
+      corner(top - 2, left + size - len + 2, true, false),
+      corner(top + size - len + 2, left - 2, false, true),
+      corner(top + size - len + 2, left + size - len + 2, true, true),
     ];
   }
 }
@@ -698,7 +919,10 @@ class _CornerPainter extends CustomPainter {
   final Color color;
   final double thickness;
   final double radius;
-  const _CornerPainter({required this.color, required this.thickness, required this.radius});
+  const _CornerPainter(
+      {required this.color,
+        required this.thickness,
+        required this.radius});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -726,9 +950,18 @@ class _CornerPainter extends CustomPainter {
 // ─────────────────────────────────────────────────
 class SetUpDeviceStep extends StatefulWidget {
   final String? btRemoteId;
-  final VoidCallback onAdd;
+
+  // ── [FIX-1] onAdd is now Future<void> Function() ─────────────────────────
+  // Previously VoidCallback — the widget fired the async call and returned
+  // immediately with no way to track loading. Now the widget awaits it and
+  // shows a spinner on the button until the API call resolves.
+  final Future<void> Function() onAdd;
+
   final VoidCallback onCancel;
   final Function(String) onNameChanged;
+
+  // isLoading driven from parent _AddDeviceFlowState._isRegistering
+  final bool isLoading;
 
   const SetUpDeviceStep({
     super.key,
@@ -736,6 +969,7 @@ class SetUpDeviceStep extends StatefulWidget {
     required this.onAdd,
     required this.onCancel,
     required this.onNameChanged,
+    required this.isLoading,
   });
 
   @override
@@ -752,19 +986,22 @@ class _SetUpDeviceStepState extends State<SetUpDeviceStep> {
     super.dispose();
   }
 
-  void _validateAndAdd() {
+  Future<void> _validateAndAdd() async {
     final trimmed = _nameController.text.trim();
     if (trimmed.isEmpty) {
       setState(() => _nameError = 'Device name cannot be empty.');
       return;
     }
     if (trimmed.length > 50) {
-      setState(() => _nameError = 'Device name must be 50 characters or fewer.');
+      setState(
+              () => _nameError = 'Device name must be 50 characters or fewer.');
       return;
     }
     setState(() => _nameError = null);
     widget.onNameChanged(trimmed);
-    widget.onAdd();
+    // Await the async registration — button disables and shows spinner
+    // via widget.isLoading until _addDevice() completes
+    await widget.onAdd();
   }
 
   @override
@@ -772,8 +1009,14 @@ class _SetUpDeviceStepState extends State<SetUpDeviceStep> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.black), onPressed: widget.onCancel),
-        title: const Text('Set Up Device', style: TextStyle(color: Colors.black)),
+        // Disable back during registration so user can't interrupt the API call
+        leading: widget.isLoading
+            ? const SizedBox.shrink()
+            : IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: widget.onCancel),
+        title: const Text('Set Up Device',
+            style: TextStyle(color: Colors.black)),
         centerTitle: true,
         backgroundColor: Colors.white,
         elevation: 0,
@@ -787,29 +1030,39 @@ class _SetUpDeviceStepState extends State<SetUpDeviceStep> {
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 30),
-                decoration: BoxDecoration(color: kLightGreenBg, borderRadius: BorderRadius.circular(20)),
+                decoration: BoxDecoration(
+                    color: kLightGreenBg,
+                    borderRadius: BorderRadius.circular(20)),
                 child: Column(
                   children: [
                     Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(color: kPrimaryGreen, shape: BoxShape.circle),
-                      child: const Icon(Icons.qr_code_2_rounded, color: Colors.white, size: 40),
+                      decoration: const BoxDecoration(
+                          color: kPrimaryGreen, shape: BoxShape.circle),
+                      child: const Icon(Icons.qr_code_2_rounded,
+                          color: Colors.white, size: 40),
                     ),
                     const SizedBox(height: 16),
-                    const Text('SafeChain Device Scanned ✅', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    const Text('SafeChain Device Scanned ✅',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 4),
-                    Text('ID: ${widget.btRemoteId ?? "Unknown"}', style: const TextStyle(color: Colors.grey)),
+                    Text('ID: ${widget.btRemoteId ?? "Unknown"}',
+                        style: const TextStyle(color: Colors.grey)),
                   ],
                 ),
               ),
               const SizedBox(height: 30),
-              const Text('Device Name', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text('Device Name',
+                  style:
+                  TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               TextFormField(
                 controller: _nameController,
+                enabled: !widget.isLoading,
                 onChanged: (val) {
-                  // Clear error as user types
-                  if (_nameError != null) setState(() => _nameError = null);
+                  if (_nameError != null)
+                    setState(() => _nameError = null);
                   widget.onNameChanged(val);
                 },
                 maxLength: 50,
@@ -829,9 +1082,30 @@ class _SetUpDeviceStepState extends State<SetUpDeviceStep> {
                         ? const BorderSide(color: Colors.red, width: 1.5)
                         : BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20, vertical: 16),
                 ),
               ),
+
+              // ── Status label shown during registration ─────────────────────
+              if (widget.isLoading) ...[
+                const SizedBox(height: 12),
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          color: kPrimaryGreen, strokeWidth: 2),
+                    ),
+                    SizedBox(width: 10),
+                    Text('Registering device…',
+                        style: TextStyle(color: Colors.grey, fontSize: 13)),
+                  ],
+                ),
+              ],
+
               const SizedBox(height: 32),
               Row(
                 children: [
@@ -839,12 +1113,18 @@ class _SetUpDeviceStepState extends State<SetUpDeviceStep> {
                     child: SizedBox(
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: widget.onCancel,
+                        // Disable Cancel during registration
+                        onPressed:
+                        widget.isLoading ? null : widget.onCancel,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFF1F5F9), elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                          backgroundColor: const Color(0xFFF1F5F9),
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30)),
                         ),
-                        child: const Text('Cancel', style: TextStyle(color: Colors.black54, fontSize: 16)),
+                        child: const Text('Cancel',
+                            style: TextStyle(
+                                color: Colors.black54, fontSize: 16)),
                       ),
                     ),
                   ),
@@ -853,12 +1133,27 @@ class _SetUpDeviceStepState extends State<SetUpDeviceStep> {
                     child: SizedBox(
                       height: 56,
                       child: ElevatedButton(
-                        onPressed: _validateAndAdd,
+                        // Disable while registering to prevent double-tap
+                        onPressed:
+                        widget.isLoading ? null : _validateAndAdd,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: kPrimaryGreen, elevation: 0,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                          backgroundColor: kPrimaryGreen,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(30)),
                         ),
-                        child: const Text('Add Device', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        child: widget.isLoading
+                            ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(
+                              color: Colors.white, strokeWidth: 2.5),
+                        )
+                            : const Text('Add Device',
+                            style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold)),
                       ),
                     ),
                   ),
@@ -876,26 +1171,116 @@ class _SetUpDeviceStepState extends State<SetUpDeviceStep> {
 // TESTING GATEWAY STEP
 // ─────────────────────────────────────────────────
 class TestingGatewayStep extends StatefulWidget {
+  final String? btRemoteId;
   final VoidCallback onSuccess;
   final VoidCallback onError;
-  const TestingGatewayStep({super.key, required this.onSuccess, required this.onError});
+
+  const TestingGatewayStep({
+    super.key,
+    required this.btRemoteId,
+    required this.onSuccess,
+    required this.onError,
+  });
 
   @override
   State<TestingGatewayStep> createState() => _TestingGatewayStepState();
 }
 
 class _TestingGatewayStepState extends State<TestingGatewayStep> {
-  Timer? _timer;
+  BluetoothDevice? _device;
+  StreamSubscription? _notifySubscription;
+  Timer? _timeoutTimer;
+
+  bool _isDone = false;
+  String _statusText = 'Connecting to device...';
+  String _bleBuffer = '';
+
+  final String _serviceUuid = '6E400001-B5A3-F393-E0A9-E50E24DCCA9E';
+  final String _rxCharUuid  = '6E400002-B5A3-F393-E0A9-E50E24DCCA9E';
+  final String _txCharUuid  = '6E400003-B5A3-F393-E0A9-E50E24DCCA9E';
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer(const Duration(seconds: 4), widget.onSuccess);
+    _runHardwareTest();
+  }
+
+  Future<void> _runHardwareTest() async {
+    if (widget.btRemoteId == null) {
+      _finishWithError();
+      return;
+    }
+
+    try {
+      _device = BluetoothDevice.fromId(widget.btRemoteId!);
+      await _device!.connect(timeout: const Duration(seconds: 10));
+
+      if (mounted) setState(() => _statusText = 'Pinging LoRa Network...');
+
+      final services = await _device!.discoverServices();
+      final service = services.firstWhere(
+            (s) => s.uuid.toString().toUpperCase() == _serviceUuid,
+        orElse: () => throw Exception('SafeChain service not found'),
+      );
+
+      final rxChar = service.characteristics.firstWhere(
+              (c) => c.uuid.toString().toUpperCase() == _rxCharUuid);
+      final txChar = service.characteristics.firstWhere(
+              (c) => c.uuid.toString().toUpperCase() == _txCharUuid);
+
+      await txChar.setNotifyValue(true);
+      _notifySubscription = txChar.lastValueStream.listen((value) {
+        if (value.isEmpty) return;
+        _bleBuffer += utf8.decode(value);
+        debugPrint('Node Log: $_bleBuffer');
+
+        if (_bleBuffer.contains('Frame=ACK')) {
+          _finishWithSuccess();
+        } else if (_bleBuffer.contains('FAILED')) {
+          _finishWithError();
+        }
+      });
+
+      // Trigger the safe packet — with [FIX-6] in the firmware this now
+      // works even when the node is idle (freshly provisioned).
+      await rxChar.write(utf8.encode('safe\n'), withoutResponse: false);
+
+      if (mounted) {
+        setState(() =>
+        _statusText = 'Waiting for Gateway ACK\n(This may take up to 20s)...');
+      }
+
+      _timeoutTimer = Timer(const Duration(seconds: 25), () {
+        debugPrint('LoRa ACK Timeout');
+        _finishWithError();
+      });
+    } catch (e) {
+      debugPrint('BLE Error during gateway test: $e');
+      _finishWithError();
+    }
+  }
+
+  void _finishWithSuccess() async {
+    if (_isDone) return;
+    _isDone = true;
+    _timeoutTimer?.cancel();
+    await _device?.disconnect();
+    if (mounted) widget.onSuccess();
+  }
+
+  void _finishWithError() async {
+    if (_isDone) return;
+    _isDone = true;
+    _timeoutTimer?.cancel();
+    await _device?.disconnect();
+    if (mounted) widget.onError();
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _timeoutTimer?.cancel();
+    _notifySubscription?.cancel();
+    _device?.disconnect();
     super.dispose();
   }
 
@@ -904,12 +1289,24 @@ class _TestingGatewayStepState extends State<TestingGatewayStep> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const SizedBox(height: 20),
-          SizedBox(height: 250, child: Center(child: RipplePulse(color: kPrimaryBlue, icon: Icons.router))),
-          const Text('Testing Gateway Connection', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          const Text('Connecting to LoRa network...', style: TextStyle(color: Colors.grey)),
+          SizedBox(
+              height: 250,
+              child: Center(
+                  child: RipplePulse(
+                      color: kPrimaryBlue, icon: Icons.router))),
+          const Text('Testing Gateway Connection',
+              style:
+              TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 40),
+            child: Text(_statusText,
+                textAlign: TextAlign.center,
+                style:
+                const TextStyle(color: Colors.grey, height: 1.5)),
+          ),
         ],
       ),
     );
@@ -922,7 +1319,10 @@ class _TestingGatewayStepState extends State<TestingGatewayStep> {
 class AllSetStep extends StatelessWidget {
   final VoidCallback onTestGps;
   final VoidCallback onGoToDeviceList;
-  const AllSetStep({super.key, required this.onTestGps, required this.onGoToDeviceList});
+  const AllSetStep(
+      {super.key,
+        required this.onTestGps,
+        required this.onGoToDeviceList});
 
   @override
   Widget build(BuildContext context) {
@@ -934,35 +1334,54 @@ class AllSetStep extends StatelessWidget {
           child: Column(
             children: [
               const SizedBox(height: 32),
-              SizedBox(height: 220, child: Center(child: RipplePulse(color: kPrimaryGreen, icon: Icons.check_rounded))),
+              SizedBox(
+                  height: 220,
+                  child: Center(
+                      child: RipplePulse(
+                          color: kPrimaryGreen,
+                          icon: Icons.check_rounded))),
               const SizedBox(height: 8),
-              const Text('Youre All Set! 🎉', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+              const Text('You\'re All Set! 🎉',
+                  style:
+                  TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              const Text('Your device is connected and ready', style: TextStyle(color: Colors.black87, fontSize: 15)),
+              const Text('Your device is connected and ready',
+                  style:
+                  TextStyle(color: Colors.black87, fontSize: 15)),
               const SizedBox(height: 4),
-              const Text('You can now test GPS location tracking', style: TextStyle(color: Colors.grey, fontSize: 13)),
+              const Text('You can now test GPS location tracking',
+                  style: TextStyle(color: Colors.grey, fontSize: 13)),
               const SizedBox(height: 40),
               SizedBox(
-                width: double.infinity, height: 56,
+                width: double.infinity,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: onTestGps,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimaryGreen, elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    backgroundColor: kPrimaryGreen,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30)),
                   ),
-                  child: const Text('Test GPS Tracking', style: TextStyle(fontSize: 18, color: Colors.white)),
+                  child: const Text('Test GPS Tracking',
+                      style:
+                      TextStyle(fontSize: 18, color: Colors.white)),
                 ),
               ),
               const SizedBox(height: 16),
               SizedBox(
-                width: double.infinity, height: 56,
+                width: double.infinity,
+                height: 56,
                 child: TextButton(
                   onPressed: onGoToDeviceList,
                   style: TextButton.styleFrom(
                     backgroundColor: const Color(0xFFF8F9FA),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30)),
                   ),
-                  child: const Text('Go to device list', style: TextStyle(fontSize: 16, color: Colors.black54)),
+                  child: const Text('Go to device list',
+                      style: TextStyle(
+                          fontSize: 16, color: Colors.black54)),
                 ),
               ),
             ],
@@ -985,13 +1404,16 @@ class RipplePulse extends StatefulWidget {
   State<RipplePulse> createState() => _RipplePulseState();
 }
 
-class _RipplePulseState extends State<RipplePulse> with SingleTickerProviderStateMixin {
+class _RipplePulseState extends State<RipplePulse>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 2400))..repeat();
+    _controller = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 2400))
+      ..repeat();
   }
 
   @override
@@ -1000,7 +1422,8 @@ class _RipplePulseState extends State<RipplePulse> with SingleTickerProviderStat
     super.dispose();
   }
 
-  double _ringProgress(double offset) => (((_controller.value - offset) % 1.0) + 1.0) % 1.0;
+  double _ringProgress(double offset) =>
+      (((_controller.value - offset) % 1.0) + 1.0) % 1.0;
 
   @override
   Widget build(BuildContext context) {
@@ -1014,12 +1437,20 @@ class _RipplePulseState extends State<RipplePulse> with SingleTickerProviderStat
             _buildRing(_ringProgress(0.333)),
             _buildRing(_ringProgress(0.666)),
             Container(
-              width: 80, height: 80,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
-                color: widget.color, shape: BoxShape.circle,
-                boxShadow: [BoxShadow(color: widget.color.withOpacity(0.45), blurRadius: 24, spreadRadius: 4)],
+                color: widget.color,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                      color: widget.color.withOpacity(0.45),
+                      blurRadius: 24,
+                      spreadRadius: 4)
+                ],
               ),
-              child: Icon(widget.icon, color: Colors.white, size: 36),
+              child:
+              Icon(widget.icon, color: Colors.white, size: 36),
             ),
           ],
         );
@@ -1045,7 +1476,8 @@ class _RipplePulseState extends State<RipplePulse> with SingleTickerProviderStat
 class ConnectionUnsuccessfulStep extends StatelessWidget {
   final VoidCallback onTryAgain;
   final VoidCallback onViewMap;
-  const ConnectionUnsuccessfulStep({super.key, required this.onTryAgain, required this.onViewMap});
+  const ConnectionUnsuccessfulStep(
+      {super.key, required this.onTryAgain, required this.onViewMap});
 
   @override
   Widget build(BuildContext context) {
@@ -1053,37 +1485,55 @@ class ConnectionUnsuccessfulStep extends StatelessWidget {
       backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+          padding:
+          const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
           child: Column(
             children: [
               const SizedBox(height: 20),
-              SizedBox(height: 250, child: Center(child: RipplePulse(color: const Color(0xFFFF5A5A), icon: Icons.signal_wifi_off_rounded))),
-              const Text('Connection Unsuccessful', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              SizedBox(
+                  height: 250,
+                  child: Center(
+                      child: RipplePulse(
+                          color: const Color(0xFFFF5A5A),
+                          icon: Icons.signal_wifi_off_rounded))),
+              const Text('Connection Unsuccessful',
+                  style:
+                  TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
                 child: Text(
-                  'Could not connect to the LoRa gateway. Please check your surroundings and try again.',
+                  'Could not connect to the LoRa gateway. '
+                      'Please check your surroundings and try again.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey, fontSize: 14, height: 1.6),
+                  style: TextStyle(
+                      color: Colors.grey, fontSize: 14, height: 1.6),
                 ),
               ),
               const SizedBox(height: 48),
               SizedBox(
-                width: double.infinity, height: 56,
+                width: double.infinity,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: onTryAgain,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: kPrimaryGreen, elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
+                    backgroundColor: kPrimaryGreen,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30)),
                   ),
-                  child: const Text('Try Again', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                  child: const Text('Try Again',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold)),
                 ),
               ),
               const SizedBox(height: 14),
               TextButton(
                 onPressed: onViewMap,
-                child: const Text('View Gateway Map', style: TextStyle(color: Colors.grey)),
+                child: const Text('View Gateway Map',
+                    style: TextStyle(color: Colors.grey)),
               ),
               const SizedBox(height: 30),
             ],
@@ -1100,7 +1550,8 @@ class ConnectionUnsuccessfulStep extends StatelessWidget {
 class GpsTestingStep extends StatefulWidget {
   final String? btRemoteId;
   final VoidCallback onBack;
-  const GpsTestingStep({super.key, required this.btRemoteId, required this.onBack});
+  const GpsTestingStep(
+      {super.key, required this.btRemoteId, required this.onBack});
 
   @override
   State<GpsTestingStep> createState() => _GpsTestingStepState();
@@ -1110,10 +1561,10 @@ class _GpsTestingStepState extends State<GpsTestingStep> {
   LatLng? _deviceLocation;
   StreamSubscription? _notifySubscription;
   StreamSubscription? _scanSubscription;
-  String _statusText = "Scanning for device...";
+  String _statusText = 'Scanning for device...';
 
-  final String _serviceUuid = "6E400001-B5A3-F393-E0A9-E50E24DCCA9E";
-  final String _txCharUuid  = "6E400003-B5A3-F393-E0A9-E50E24DCCA9E";
+  final String _serviceUuid = '6E400001-B5A3-F393-E0A9-E50E24DCCA9E';
+  final String _txCharUuid  = '6E400003-B5A3-F393-E0A9-E50E24DCCA9E';
 
   @override
   void initState() {
@@ -1123,7 +1574,7 @@ class _GpsTestingStepState extends State<GpsTestingStep> {
 
   Future<void> _findAndConnect() async {
     if (widget.btRemoteId == null) {
-      if (mounted) setState(() => _statusText = "Error: No device ID");
+      if (mounted) setState(() => _statusText = 'Error: No device ID');
       return;
     }
     try {
@@ -1138,49 +1589,56 @@ class _GpsTestingStepState extends State<GpsTestingStep> {
         }
       });
     } catch (e) {
-      if (mounted) setState(() => _statusText = "Scan error: $e");
+      if (mounted) setState(() => _statusText = 'Scan error: $e');
     }
   }
 
   Future<void> _setupBleListener(BluetoothDevice device) async {
     try {
-      if (mounted) setState(() => _statusText = "Connecting...");
+      if (mounted) setState(() => _statusText = 'Connecting...');
       await device.connect(timeout: const Duration(seconds: 10));
-      if (mounted) setState(() => _statusText = "Discovering services...");
+      if (mounted)
+        setState(() => _statusText = 'Discovering services...');
 
       final services = await device.discoverServices();
       final service = services.firstWhere(
             (s) => s.uuid.toString().toUpperCase() == _serviceUuid,
-        orElse: () => throw Exception("SafeChain service not found"),
+        orElse: () => throw Exception('SafeChain service not found'),
       );
       final characteristic = service.characteristics.firstWhere(
             (c) => c.uuid.toString().toUpperCase() == _txCharUuid,
-        orElse: () => throw Exception("TX characteristic not found"),
+        orElse: () => throw Exception('TX characteristic not found'),
       );
 
-      if (!characteristic.isNotifying) await characteristic.setNotifyValue(true);
-      if (mounted) setState(() => _statusText = "Waiting for GPS update...");
+      if (!characteristic.isNotifying)
+        await characteristic.setNotifyValue(true);
+      if (mounted)
+        setState(() => _statusText = 'Waiting for GPS update...');
 
-      _notifySubscription = characteristic.lastValueStream.listen((value) {
-        try {
-          final data = utf8.decode(value).trim();
-          if (data.contains(',')) {
-            final parts = data.split(',');
-            if (parts.length == 2) {
-              final lat = double.tryParse(parts[0]);
-              final lon = double.tryParse(parts[1]);
-              if (lat != null && lon != null && lat != 0.0) {
-                if (mounted) setState(() {
-                  _deviceLocation = LatLng(lat, lon);
-                  _statusText = "Device Data Received";
-                });
+      _notifySubscription =
+          characteristic.lastValueStream.listen((value) {
+            try {
+              final data = utf8.decode(value).trim();
+              if (data.contains(',')) {
+                final parts = data.split(',');
+                if (parts.length == 2) {
+                  final lat = double.tryParse(parts[0]);
+                  final lon = double.tryParse(parts[1]);
+                  if (lat != null && lon != null && lat != 0.0) {
+                    if (mounted) {
+                      setState(() {
+                        _deviceLocation = LatLng(lat, lon);
+                        _statusText = 'Device Data Received';
+                      });
+                    }
+                  }
+                }
               }
-            }
-          }
-        } catch (_) {}
-      });
+            } catch (_) {}
+          });
     } catch (e) {
-      if (mounted) setState(() => _statusText = "Connection Error: $e");
+      if (mounted)
+        setState(() => _statusText = 'Connection Error: $e');
     }
   }
 
@@ -1196,7 +1654,8 @@ class _GpsTestingStepState extends State<GpsTestingStep> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: widget.onBack),
+        leading: IconButton(
+            icon: const Icon(Icons.arrow_back), onPressed: widget.onBack),
         title: const Text('GPS Testing'),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
@@ -1206,35 +1665,53 @@ class _GpsTestingStepState extends State<GpsTestingStep> {
         children: [
           FlutterMap(
             options: MapOptions(
-              initialCenter: _deviceLocation ?? const LatLng(14.5995, 120.9842),
+              initialCenter:
+              _deviceLocation ?? const LatLng(14.5995, 120.9842),
               initialZoom: 16.0,
             ),
             children: [
-              TileLayer(urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
+              TileLayer(
+                  urlTemplate:
+                  'https://tile.openstreetmap.org/{z}/{x}/{y}.png'),
               if (_deviceLocation != null)
                 MarkerLayer(markers: [
                   Marker(
-                    point: _deviceLocation!, width: 80, height: 80,
+                    point: _deviceLocation!,
+                    width: 80,
+                    height: 80,
                     child: Column(children: [
                       Container(
                         padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
-                        child: const Icon(Icons.location_pin, color: kPrimaryGreen, size: 40),
+                        decoration: const BoxDecoration(
+                            color: Colors.white,
+                            shape: BoxShape.circle),
+                        child: const Icon(Icons.location_pin,
+                            color: kPrimaryGreen, size: 40),
                       ),
-                      const Text("Device", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10)),
+                      const Text('Device',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10)),
                     ]),
                   ),
                 ]),
             ],
           ),
           Positioned(
-            bottom: 40, left: 20, right: 20,
+            bottom: 40,
+            left: 20,
+            right: 20,
             child: Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 15, offset: const Offset(0, 5))],
+                boxShadow: [
+                  BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5))
+                ],
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -1242,17 +1719,22 @@ class _GpsTestingStepState extends State<GpsTestingStep> {
                   if (_deviceLocation == null)
                     const Padding(
                       padding: EdgeInsets.only(bottom: 10),
-                      child: CircularProgressIndicator(color: kPrimaryGreen),
+                      child: CircularProgressIndicator(
+                          color: kPrimaryGreen),
                     ),
-                  Text(_statusText, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(_statusText,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16)),
                   if (_deviceLocation != null) ...[
                     const SizedBox(height: 8),
                     const Divider(),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                       children: [
-                        _infoItem("LAT", _deviceLocation!.latitude.toStringAsFixed(6)),
-                        _infoItem("LNG", _deviceLocation!.longitude.toStringAsFixed(6)),
+                        _infoItem('LAT',
+                            _deviceLocation!.latitude.toStringAsFixed(6)),
+                        _infoItem('LNG',
+                            _deviceLocation!.longitude.toStringAsFixed(6)),
                       ],
                     ),
                   ],
@@ -1268,16 +1750,20 @@ class _GpsTestingStepState extends State<GpsTestingStep> {
   Widget _infoItem(String label, String value) {
     return Column(
       children: [
-        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+        Text(label,
+            style:
+            const TextStyle(color: Colors.grey, fontSize: 12)),
         const SizedBox(height: 4),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        Text(value,
+            style: const TextStyle(
+                fontWeight: FontWeight.bold, fontSize: 16)),
       ],
     );
   }
 }
 
 // ─────────────────────────────────────────────────
-// CONNECTING DEVICE STEP (INDUSTRY STANDARD LOCAL VERIFICATION)
+// CONNECTING DEVICE STEP
 // ─────────────────────────────────────────────────
 enum ConnectionPhase { connecting, success, error }
 
@@ -1290,11 +1776,12 @@ class ConnectingDeviceStep extends StatefulWidget {
     super.key,
     required this.btRemoteId,
     required this.onSuccess,
-    required this.onError
+    required this.onError,
   });
 
   @override
-  State<ConnectingDeviceStep> createState() => _ConnectingDeviceStepState();
+  State<ConnectingDeviceStep> createState() =>
+      _ConnectingDeviceStepState();
 }
 
 class _ConnectingDeviceStepState extends State<ConnectingDeviceStep> {
@@ -1313,26 +1800,16 @@ class _ConnectingDeviceStepState extends State<ConnectingDeviceStep> {
     }
 
     try {
-      // 1. Attempt local connection
       final device = BluetoothDevice.fromId(widget.btRemoteId!);
       await device.connect(timeout: const Duration(seconds: 7));
-
-      // 2. Disconnect to free up the radio
       await device.disconnect();
 
-      // 3. Update UI to show Success to the user
       if (mounted) {
         setState(() => _phase = ConnectionPhase.success);
-
-        // Wait 2 seconds so the user can read the success message
         await Future.delayed(const Duration(seconds: 2));
-
-        // Move to Setup screen
         if (mounted) widget.onSuccess();
       }
-
     } catch (e) {
-      // Failed to connect
       if (mounted) widget.onError();
     }
   }
@@ -1348,23 +1825,30 @@ class _ConnectingDeviceStepState extends State<ConnectingDeviceStep> {
             height: 250,
             child: Center(
               child: _phase == ConnectionPhase.connecting
-                  ? const RipplePulse(color: kPrimaryBlue, icon: Icons.bluetooth_searching)
-                  : const RipplePulse(color: kPrimaryGreen, icon: Icons.bluetooth_connected),
+                  ? const RipplePulse(
+                  color: kPrimaryBlue,
+                  icon: Icons.bluetooth_searching)
+                  : const RipplePulse(
+                  color: kPrimaryGreen,
+                  icon: Icons.bluetooth_connected),
             ),
           ),
           Text(
-              _phase == ConnectionPhase.connecting ? 'Verifying Device...' : 'Device Connected! ✅',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)
+            _phase == ConnectionPhase.connecting
+                ? 'Verifying Device...'
+                : 'Device Connected! ✅',
+            style: const TextStyle(
+                fontSize: 20, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 12),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 40),
             child: Text(
-                _phase == ConnectionPhase.connecting
-                    ? 'Ensuring your SafeChain device is turned on and nearby.'
-                    : 'Pairing successful. Moving to registration...',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.grey)
+              _phase == ConnectionPhase.connecting
+                  ? 'Ensuring your SafeChain device is turned on and nearby.'
+                  : 'Pairing successful. Moving to registration...',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.grey),
             ),
           ),
         ],
