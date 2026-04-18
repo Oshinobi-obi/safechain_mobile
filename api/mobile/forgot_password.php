@@ -52,7 +52,26 @@ try {
     $insert_stmt->execute();
     $insert_stmt->close();
 
+<<<<<<< HEAD
     $conn->close();
+=======
+    $mail = new PHPMailer(true);
+    try {
+        $mail->isSMTP();
+        $mail->Host       = 'smtp.gmail.com';
+        $mail->SMTPAuth   = true;
+        $mail->Username   = '';
+        $mail->Password   = '';
+        $mail->SMTPSecure = PHPMailer::ENCRYPTION_STARTTLS;
+        $mail->Port       = 587;
+        $mail->setFrom('', '');
+        $mail->addAddress($email);
+        $reset_link = "https://safechain.site/reset-password-page?token=" . $token;
+        $mail->isHTML(true);
+        $mail->Subject = 'Password Reset Request for SafeChain';
+        $mail->Body    = "Hello,<br><br>Please click the following link to reset your password: <a href=\"".$reset_link."\">Reset Password</a><br><br>This link will expire in one hour.";
+        $mail->AltBody = 'Please use the following link to reset your password: ' . $reset_link;
+>>>>>>> ca0f650a0731c047b404bc8b184d2b43328be640
 
     // Send response to Flutter immediately
     http_response_code(200);
@@ -174,5 +193,14 @@ try {
     ob_clean();
     http_response_code(500);
     echo json_encode(['status' => 'error', 'message' => 'An internal error occurred: ' . $e->getMessage()]);
+<<<<<<< HEAD
     ob_end_flush();
 }
+=======
+} finally {
+    if (isset($conn)) {
+        $conn->close();
+    }
+}
+?>
+>>>>>>> ca0f650a0731c047b404bc8b184d2b43328be640
