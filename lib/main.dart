@@ -6,7 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:safechain/screens/forgot_password/reset_password_screen.dart';
 import 'package:safechain/screens/startup/startup_screen.dart';
-import 'package:safechain/services/connectivity_service.dart'; // ← NEW
+import 'package:safechain/services/connectivity_service.dart';
 import 'package:safechain/services/notification_service.dart';
 import 'package:safechain/firebase_options.dart';
 
@@ -16,10 +16,19 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
   final title = message.notification?.title ?? message.data['title'] ?? 'SafeChain';
   final body  = message.notification?.body  ?? message.data['body']  ?? '';
+
+  final String typeString = message.data['type'] ?? 'announcement';
+  final NotificationType type = NotificationType.values.firstWhere(
+        (e) => e.name == typeString,
+    orElse: () => NotificationType.announcement,
+  );
+
   if (title.isNotEmpty) {
-    await NotificationService.showLocalNotification(title, body);
+    // OS handles the banner, we just silently save it to the inbox
+    await NotificationService.addNotification(title, body, type, showBanner: false);
   }
 }
 
@@ -65,12 +74,19 @@ class _MyAppState extends State<MyApp> {
   }
 
   void _initFCMListeners() {
-    // App is in foreground — show local notification
+    // App is in foreground — show local notification AND save to inbox
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       final title = message.notification?.title ?? message.data['title'] ?? 'SafeChain';
       final body  = message.notification?.body  ?? message.data['body']  ?? '';
+
+      final String typeString = message.data['type'] ?? 'announcement';
+      final NotificationType type = NotificationType.values.firstWhere(
+            (e) => e.name == typeString,
+        orElse: () => NotificationType.announcement,
+      );
+
       if (title.isNotEmpty) {
-        NotificationService.showLocalNotification(title, body);
+        NotificationService.addNotification(title, body, type, showBanner: true);
       }
     });
 

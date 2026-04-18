@@ -111,36 +111,73 @@ class NotificationService {
 
     final messaging = FirebaseMessaging.instance;
 
-    // Request permission (iOS + Android 13+)
     await messaging.requestPermission(
       alert: true,
       badge: true,
       sound: true,
     );
 
-    // Get FCM token
+    // Get and save FCM token — upload to server only if user is logged in.
+    // If not logged in yet, the token is cached in SharedPreferences and
+    // uploadTokenAfterLogin() will send it once the user signs in.
     final token = await messaging.getToken();
     if (token != null) {
       await _saveFCMToken(token);
     }
 
-    // Listen for token refresh
+    // Listen for token refresh — always re-upload the new token
     messaging.onTokenRefresh.listen((newToken) async {
-      await _saveFCMToken(newToken);
+      await _saveFCMToken(newToken, forceUpload: true);
     });
   }
 
-  // ── Save FCM token to server + local prefs ────────────────────
-  static Future<void> _saveFCMToken(String token) async {
+  // ── FIX: Call this right after a user logs in ─────────────────
+  // Reads the cached FCM token from prefs and uploads it to the server.
+  // This is needed because initializeFCM() runs at startup before login,
+  // so the user is null at that point and the upload is skipped.
+  static Future<void> uploadTokenAfterLogin() async {
+    if (!Platform.isAndroid && !Platform.isIOS) return;
     final prefs = await SharedPreferences.getInstance();
-    final oldToken = prefs.getString(_fcmTokenKey);
-
-    // Only update server if token changed
-    if (oldToken == token) return;
-    await prefs.setString(_fcmTokenKey, token);
+    final token = prefs.getString(_fcmTokenKey);
+    if (token == null) return;
 
     final user = await SessionManager.getUser();
     if (user == null) return;
+
+    try {
+      await http.post(
+        Uri.parse('$_baseUrl/api/fcm/save_token.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'resident_id': user.residentId,
+          'fcm_token': token,
+          'platform': Platform.isAndroid ? 'android' : 'ios',
+        }),
+      );
+    } catch (e) {
+      // Silently fail — will be retried next time
+    }
+  }
+
+  // ── Save FCM token to server + local prefs ────────────────────
+  // forceUpload: true skips the oldToken == token early-exit check.
+  // Used by onTokenRefresh to ensure a changed token always gets uploaded.
+  static Future<void> _saveFCMToken(String token, {bool forceUpload = false}) async {
+    final prefs = await SharedPreferences.getInstance();
+    final oldToken = prefs.getString(_fcmTokenKey);
+
+    // Always cache the latest token locally
+    await prefs.setString(_fcmTokenKey, token);
+
+    // Skip server upload if token unchanged and not forced
+    if (!forceUpload && oldToken == token) return;
+
+    final user = await SessionManager.getUser();
+    if (user == null) {
+      // User not logged in yet — token is saved to prefs above.
+      // uploadTokenAfterLogin() will handle the server upload after login.
+      return;
+    }
 
     try {
       await http.post(
@@ -157,7 +194,7 @@ class NotificationService {
     }
   }
 
-  // ── Show a local notification (used for FCM foreground/background) ──
+  // ── Show a local notification ─────────────────────────────────
   static Future<void> showLocalNotification(String title, String body,
       {NotificationType type = NotificationType.announcement}) async {
     if (!_localNotifInitialized) await initialize();
@@ -189,12 +226,13 @@ class NotificationService {
     );
   }
 
-  // ── Add in-app notification + show local banner ───────────────
+  // ── Add in-app notification + optionally show local banner ────
   static Future<void> addNotification(
       String title,
       String message,
-      NotificationType type,
-      ) async {
+      NotificationType type, {
+        bool showBanner = true,
+      }) async {
     final user = await SessionManager.getUser();
     if (user == null) return;
 
@@ -212,7 +250,10 @@ class NotificationService {
     if (notifications.length > 50) notifications.removeLast();
 
     await _saveAndBroadcast(user.residentId, notifications);
-    await showLocalNotification(title, message, type: type);
+
+    if (showBanner) {
+      await showLocalNotification(title, message, type: type);
+    }
   }
 
   // ── Internal save + broadcast ─────────────────────────────────

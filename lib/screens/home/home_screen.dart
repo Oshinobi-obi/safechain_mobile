@@ -217,6 +217,7 @@ class _DevicesContentState extends State<DevicesContent> with TickerProviderStat
         _currentUser = user;
         _devicesFuture = _fetchDevices(user.residentId);
       });
+      NotificationService.uploadTokenAfterLogin();
     }
   }
 
