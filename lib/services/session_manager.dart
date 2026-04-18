@@ -11,6 +11,7 @@ class UserModel {
   final List<String> medicalConditions;
   final String? profilePictureUrl;
   final String? avatar;
+  final String status; // 'active' or 'restricted'
 
   UserModel({
     required this.residentId,
@@ -21,6 +22,7 @@ class UserModel {
     this.medicalConditions = const [],
     this.profilePictureUrl,
     this.avatar,
+    this.status = 'active',
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
@@ -52,6 +54,7 @@ class UserModel {
       medicalConditions: conditions,
       profilePictureUrl: json['profile_picture_url']?.toString(),
       avatar: json['avatar']?.toString(),
+      status: json['status']?.toString() ?? 'active',
     );
   }
 
@@ -65,6 +68,7 @@ class UserModel {
       'medical_conditions': jsonEncode(medicalConditions),
       'profile_picture_url': profilePictureUrl,
       'avatar': avatar,
+      'status': status,
     };
   }
 }

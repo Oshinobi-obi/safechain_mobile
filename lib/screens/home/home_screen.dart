@@ -678,6 +678,44 @@ class _DevicesContentState extends State<DevicesContent> with TickerProviderStat
                 ),
               ),
               const SliverToBoxAdapter(child: ProfileCompletionBanner()),
+
+              // ── Account restricted banner ───────────────────────────
+              if (_currentUser?.status == 'restricted')
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFEF4444), width: 1.5),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.block_rounded, color: Color(0xFFEF4444), size: 28),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Account Restricted',
+                                  style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 15),
+                                ),
+                                SizedBox(height: 2),
+                                Text(
+                                  'You have been restricted due to multiple false alarms. Contact admin to lift the restriction.',
+                                  style: TextStyle(color: Color(0xFF7F1D1D), fontSize: 12, height: 1.4),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               if (snapshot.connectionState == ConnectionState.waiting)
                 const SliverToBoxAdapter(child: Padding(padding: EdgeInsets.all(32.0), child: Center(child: CircularProgressIndicator(color: Color(0xFF20C997))))),
 
@@ -798,6 +836,7 @@ class _DevicesContentState extends State<DevicesContent> with TickerProviderStat
   Widget _buildDeviceCard(BuildContext context, Device device) {
     return DeviceCard(
       device: device,
+      isRestricted: _currentUser?.status == 'restricted',
       onSettingsPressed: () => _showDeviceSettings(context, device),
     );
   }
@@ -808,9 +847,10 @@ class _DevicesContentState extends State<DevicesContent> with TickerProviderStat
 // ─────────────────────────────────────────────────
 class DeviceCard extends StatefulWidget {
   final Device device;
+  final bool isRestricted;
   final VoidCallback onSettingsPressed;
 
-  const DeviceCard({super.key, required this.device, required this.onSettingsPressed});
+  const DeviceCard({super.key, required this.device, this.isRestricted = false, required this.onSettingsPressed});
 
   @override
   State<DeviceCard> createState() => _DeviceCardState();
@@ -895,10 +935,17 @@ class _DeviceCardState extends State<DeviceCard> {
   @override
   Widget build(BuildContext context) {
     final bool isConnected = _connectionState == BluetoothConnectionState.connected;
-    final Color statusColor = _isConnecting
+    final bool isRestricted = widget.isRestricted;
+
+    final Color statusColor = isRestricted
+        ? const Color(0xFFEF4444)
+        : _isConnecting
         ? Colors.orange
         : (isConnected ? const Color(0xFF20C997) : Colors.grey);
-    final String statusText = _isConnecting
+
+    final String statusText = isRestricted
+        ? 'Device Restricted'
+        : _isConnecting
         ? 'Connecting...'
         : (isConnected ? 'Connected' : 'Disconnected (Tap to connect)');
 
@@ -913,7 +960,9 @@ class _DeviceCardState extends State<DeviceCard> {
         borderRadius: BorderRadius.circular(20),
         child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          onTap: _toggleConnection, // Tap anywhere on the card to connect/disconnect
+          // Disable tap entirely when restricted — prevents BleConnectionService
+          // and FlutterForegroundTask from starting for a restricted account.
+          onTap: isRestricted ? null : _toggleConnection,
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -959,7 +1008,7 @@ class _DeviceCardState extends State<DeviceCard> {
                   children: [
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () {
+                        onPressed: isRestricted ? null : () {
                           Navigator.push(
                               context,
                               FadePageRoute(
@@ -970,9 +1019,14 @@ class _DeviceCardState extends State<DeviceCard> {
                               )
                           );
                         },
-                        icon: Image.asset('images/gps-icon.png', width: 20, color: Colors.white),
-                        label: const Text('Test GPS', style: TextStyle(color: Colors.white, fontSize: 16)),
-                        style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF20C997), padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), elevation: 0),
+                        icon: Image.asset('images/gps-icon.png', width: 20, color: isRestricted ? Colors.grey : Colors.white),
+                        label: Text('Test GPS', style: TextStyle(color: isRestricted ? Colors.grey : Colors.white, fontSize: 16)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isRestricted ? Colors.grey.shade200 : const Color(0xFF20C997),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          elevation: 0,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 12),
