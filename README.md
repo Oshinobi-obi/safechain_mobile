@@ -68,7 +68,7 @@ A community personal safety application built with Flutter, designed to provide 
 - Buttons that would fail while offline are blocked with a user-friendly snackbar
 
 ### 🛡️ Account Restriction System
-- Resident accounts can be set to `restricted` status by barangay admins
+- Resident accounts can be set to `restricted` status by responders and can only be lifted by baranggay admins
 - Restricted devices display a banner and all BLE / GPS tracking features are disabled
 - Status is refreshed from the server on every home screen load
 
