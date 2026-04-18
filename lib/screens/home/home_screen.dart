@@ -218,6 +218,32 @@ class _DevicesContentState extends State<DevicesContent> with TickerProviderStat
         _devicesFuture = _fetchDevices(user.residentId);
       });
       NotificationService.uploadTokenAfterLogin();
+      // Always re-fetch the latest status from server so the UI reflects
+      // any restriction that happened since the last login.
+      _refreshUserStatus(user.residentId);
+    }
+  }
+
+  // Re-fetches the resident's current status from the server and updates
+  // the local session + UI. Called on every home screen load so that a
+  // restriction applied by a responder is visible without re-login.
+  Future<void> _refreshUserStatus(String residentId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('https://safechain.site/api/mobile/get_profile.php?resident_id=$residentId'),
+      );
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body);
+        // Accept both {status:'success', resident:{...}} and {status:'success', data:{...}}
+        final raw = body['resident'] ?? body['data'] ?? body['user'];
+        if (raw != null) {
+          final updatedUser = UserModel.fromJson(raw);
+          await SessionManager.saveUser(updatedUser);
+          if (mounted) setState(() => _currentUser = updatedUser);
+        }
+      }
+    } catch (_) {
+      // Silently fail — cached status is used as fallback
     }
   }
 
@@ -700,12 +726,12 @@ class _DevicesContentState extends State<DevicesContent> with TickerProviderStat
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Account Restricted',
+                                  'Device Restricted',
                                   style: TextStyle(color: Color(0xFFEF4444), fontWeight: FontWeight.bold, fontSize: 15),
                                 ),
                                 SizedBox(height: 2),
                                 Text(
-                                  'You have been restricted due to multiple false alarms. Contact admin to lift the restriction.',
+                                  'You device has been restricted due to multiple false alarms. Contact admin to lift the restriction.',
                                   style: TextStyle(color: Color(0xFF7F1D1D), fontSize: 12, height: 1.4),
                                 ),
                               ],
@@ -983,7 +1009,7 @@ class _DeviceCardState extends State<DeviceCard> {
                           Text('ID: ${widget.device.btRemoteId}', style: const TextStyle(color: Colors.grey, fontSize: 14)),
                           const SizedBox(height: 6),
 
-                          // --- NEW CONNECTION STATUS INDICATOR ---
+                          // --- BLE CONNECTION STATUS ---
                           Row(
                             children: [
                               Container(
@@ -996,6 +1022,36 @@ class _DeviceCardState extends State<DeviceCard> {
                                 style: TextStyle(color: statusColor, fontSize: 12, fontWeight: FontWeight.bold),
                               ),
                             ],
+                          ),
+                          const SizedBox(height: 4),
+                          // --- ACCOUNT STATUS PILL (Active / Restricted) ---
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: isRestricted
+                                  ? const Color(0xFFFEE2E2)
+                                  : const Color(0xFFD1FAE5),
+                              borderRadius: BorderRadius.circular(99),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isRestricted ? Icons.block_rounded : Icons.check_circle_rounded,
+                                  size: 11,
+                                  color: isRestricted ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  isRestricted ? 'Restricted' : 'Active',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: isRestricted ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ],
                       ),

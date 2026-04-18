@@ -22,7 +22,7 @@ if (!$email || !$password) {
 }
 
 try {
-    $stmt = $conn->prepare("SELECT resident_id, name, email, password, address, contact, medical_conditions, profile_picture_url, avatar FROM residents WHERE email = ? AND is_archived = 0");
+    $stmt = $conn->prepare("SELECT resident_id, name, email, password, address, contact, medical_conditions, profile_picture_url, avatar, status FROM residents WHERE email = ? AND is_archived = 0");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
