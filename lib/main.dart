@@ -35,21 +35,14 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Firebase only works on Android/iOS — skip on Windows/desktop
+  // 1. Initialize Firebase (Critical, must be done before runApp)
   if (Platform.isAndroid || Platform.isIOS) {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
 
-  await NotificationService.initialize();
-
-  if (Platform.isAndroid || Platform.isIOS) {
-    await NotificationService.initializeFCM();
-  }
-
-  // ── Start monitoring internet connectivity ────────────────────────────────
-  ConnectivityService().initialize();
-
+  // 2. IMMEDIATELY run the app to prevent the black screen.
+  // We no longer await Notification or Connectivity services here.
   runApp(const MyApp());
 }
 
@@ -67,10 +60,27 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
+
+    // 3. Initialize non-blocking services AFTER the UI starts rendering
+    _initializeAppServices();
+
     _initDeepLinks();
     if (Platform.isAndroid || Platform.isIOS) {
       _initFCMListeners();
     }
+  }
+
+  // NEW: Background initialization function
+  Future<void> _initializeAppServices() async {
+    await NotificationService.initialize();
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      // Do not await this, let it fetch the token and ask permissions in the background
+      NotificationService.initializeFCM();
+    }
+
+    // Start monitoring internet connectivity
+    ConnectivityService().initialize();
   }
 
   void _initFCMListeners() {
