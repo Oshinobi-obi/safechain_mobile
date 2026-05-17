@@ -23,6 +23,50 @@ if (!$resident_id || !$name || !$bt_remote_id) {
 }
 
 try {
+    // --- FEATURE 1: Check 1:1 Device-to-Account Ratio ---
+    $check_account_stmt = $conn->prepare("SELECT device_id FROM devices WHERE resident_id = ? AND status != 'deactivated'");
+    $check_account_stmt->bind_param("s", $resident_id);
+    $check_account_stmt->execute();
+    if ($check_account_stmt->get_result()->num_rows > 0) {
+        http_response_code(403);
+        echo json_encode(['status' => 'error', 'message' => 'You already have an active device registered to your account.']);
+        $check_account_stmt->close();
+        exit;
+    }
+    $check_account_stmt->close();
+
+    // --- FEATURE 2: Check 1 Device Per Household ---
+    // Fetch the resident's registered address
+    $address_stmt = $conn->prepare("SELECT address FROM residents WHERE resident_id = ?");
+    $address_stmt->bind_param("s", $resident_id);
+    $address_stmt->execute();
+    $res_result = $address_stmt->get_result();
+
+    if ($res_result->num_rows > 0) {
+        $address = $res_result->fetch_assoc()['address'];
+
+        // Check if any active device is already registered under this address
+        $household_stmt = $conn->prepare("
+            SELECT d.device_id
+            FROM devices d
+            JOIN residents r ON d.resident_id = r.resident_id
+            WHERE r.address = ? AND d.status != 'deactivated'
+        ");
+        $household_stmt->bind_param("s", $address);
+        $household_stmt->execute();
+
+        if ($household_stmt->get_result()->num_rows > 0) {
+            http_response_code(403);
+            echo json_encode(['status' => 'error', 'message' => 'A device is already registered for this household/address.']);
+            $household_stmt->close();
+            $address_stmt->close();
+            exit;
+        }
+        $household_stmt->close();
+    }
+    $address_stmt->close();
+
+    // --- Original Insert Logic ---
     $stmt = $conn->prepare(
         "INSERT INTO devices (resident_id, name, bt_remote_id) VALUES (?, ?, ?)"
     );

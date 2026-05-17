@@ -3,16 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:safechain/services/session_manager.dart';
-import 'package:safechain/services/connectivity_service.dart';   // ← NEW
+import 'package:safechain/services/connectivity_service.dart';
 import 'package:safechain/screens/home/home_screen.dart';
 import 'package:safechain/screens/signup/signup_screen.dart';
 import 'package:safechain/screens/forgot_password/forgot_password_screen.dart';
 import 'package:safechain/modals/error_modal.dart';
 import 'package:safechain/widgets/fade_page_route.dart';
-import 'package:safechain/widgets/offline_banner.dart';           // ← NEW
+import 'package:safechain/widgets/offline_banner.dart';
 
 // ── Key used to persist the Remember Me preference ────────────────────────
-// Kept here so both read & write always use the same literal.
 const _kRememberMeKey = 'rememberMeEnabled';
 
 class LoginScreen extends StatefulWidget {
@@ -42,7 +41,6 @@ class _LoginScreenState extends State<LoginScreen> {
     final rememberMeEnabled = prefs.getBool(_kRememberMeKey) ?? false;
 
     if (rememberMeEnabled) {
-      // User opted in to persistent login — skip the login screen.
       final isLoggedIn = await SessionManager.isLoggedIn();
       if (isLoggedIn && mounted) {
         Navigator.of(context).pushReplacement(
@@ -51,7 +49,6 @@ class _LoginScreenState extends State<LoginScreen> {
         return;
       }
     } else {
-      // No Remember Me — clear any stale session so they must log in fresh.
       await SessionManager.logout();
     }
 
@@ -70,8 +67,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
-    // Block the action when offline — the button is still tappable so the user
-    // gets feedback instead of a silent failure.
     if (!ConnectivityService().isOnline) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -106,8 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
         final user = UserModel.fromJson(responseBody['user']);
         await SessionManager.saveUser(user);
 
-        // Persist the Remember Me preference so _checkLoginStatus knows what
-        // to do on the next cold start.
+        // Persist the Remember Me preference
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool(_kRememberMeKey, _rememberMe);
 
@@ -118,9 +112,44 @@ class _LoginScreenState extends State<LoginScreen> {
         }
 
         if (!mounted) return;
-        Navigator.of(context).pushReplacement(
-          FadePageRoute(child: const HomeScreen()),
-        );
+
+        // --- FEATURE: RESTRICTION NOTIFICATION ---
+        if (user.status == 'restricted') {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder: (context) => AlertDialog(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              title: const Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.red, size: 28),
+                  SizedBox(width: 8),
+                  Text('Account Restricted', style: TextStyle(color: Colors.red)),
+                ],
+              ),
+              content: const Text(
+                'Your account has been restricted due to multiple false emergency reports. Please coordinate with the Barangay Hall to explain and lift this restriction.',
+                style: TextStyle(fontSize: 16),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context); // Close Dialog
+                    Navigator.of(context).pushReplacement(
+                      FadePageRoute(child: const HomeScreen()),
+                    );
+                  },
+                  child: const Text('I Understand', style: TextStyle(color: Color(0xFF20C997), fontWeight: FontWeight.bold)),
+                ),
+              ],
+            ),
+          );
+        } else {
+          // Normal Login
+          Navigator.of(context).pushReplacement(
+            FadePageRoute(child: const HomeScreen()),
+          );
+        }
       } else {
         showDialog(
           context: context,
@@ -155,13 +184,12 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF20C997),
-      // ── Offline banner sits OUTSIDE SafeArea so it hugs the very top ───────
       body: Column(
         children: [
-          const OfflineBanner(), // ← NEW: always visible at top of this screen
+          const OfflineBanner(),
           Expanded(
             child: SafeArea(
-              top: false, // status bar already accounted for by Scaffold
+              top: false,
               child: LayoutBuilder(
                 builder: (context, constraints) {
                   return SingleChildScrollView(
